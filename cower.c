@@ -58,8 +58,7 @@
 
 #define COWER_USERAGENT       "cower/3.x"
 
-#define AUR_PKGBUILD_PATH     "%s://aur.archlinux.org/packages/%s/PKGBUILD"
-#define AUR_PKG_URL           "%s://aur.archlinux.org/packages/%s/%s.tar.gz"
+#define AUR_BASE_URL          "%s://aur.archlinux.org%s"
 #define AUR_PKG_URL_FORMAT    "%s://aur.archlinux.org/packages.php?ID="
 #define AUR_RPC_URL           "%s://aur.archlinux.org/rpc.php?type=%s&arg=%s"
 #define THREAD_DEFAULT        10
@@ -75,6 +74,7 @@
 #define NAME                  "Name"
 #define VERSION               "Version"
 #define URL                   "URL"
+#define URLPATH               "URLPath"
 
 #define AUR_ID                "ID"
 #define AUR_CAT               "CategoryID"
@@ -196,6 +196,7 @@ struct aurpkg_t {
   const char *url;
   const char *lic;
   const char *votes;
+  char *urlpath;
   int cat;
   int ood;
 
@@ -276,6 +277,7 @@ static void *task_download(CURL*, void*);
 static void *task_query(CURL*, void*);
 static void *task_update(CURL*, void*);
 static void *thread_pool(void*);
+static char *url_encode(CURL*, char*, const char*);
 static void usage(void);
 static void version(void);
 static size_t yajl_parse_stream(void*, size_t, size_t, void*);
@@ -862,6 +864,8 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
     parse_struct->aurpkg->desc = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, URL)) {
     parse_struct->aurpkg->url = strndup(val, size);
+  } else if (STREQ(parse_struct->curkey, URLPATH)) {
+    parse_struct->aurpkg->urlpath = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, AUR_LICENSE)) {
     parse_struct->aurpkg->lic = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, AUR_VOTES)) {
@@ -1816,10 +1820,10 @@ void *task_download(CURL *curl, void *arg) { /* {{{ */
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 
-  escaped = curl_easy_escape(curl, arg, strlen(arg));
-  cwr_asprintf(&url, AUR_PKG_URL, cfg.proto, escaped, escaped);
+  escaped = url_encode(curl, ((struct aurpkg_t*)(queryresult->data))->urlpath, "/");
+  cwr_asprintf(&url, AUR_BASE_URL, cfg.proto, escaped);
   curl_easy_setopt(curl, CURLOPT_URL, url);
-  curl_free(escaped);
+  free(escaped);
 
   curlstat = curl_easy_perform(curl);
 
@@ -1911,7 +1915,7 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, yajl_parse_stream);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, yajl_hand);
 
-  escaped = curl_easy_escape(curl, argstr, span);
+  escaped = url_encode(curl, (char*)argstr, NULL);
   if (cfg.opmask & OP_SEARCH) {
     cwr_asprintf(&url, AUR_RPC_URL, cfg.proto, AUR_QUERY_TYPE_SEARCH, escaped);
   } else if (cfg.opmask & OP_MSEARCH) {
@@ -1943,12 +1947,17 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
 
   if (pkglist && cfg.extinfo) {
     struct aurpkg_t *aurpkg;
-    char *pburl, *pkgbuild;
+    char *pburl, *slash, *escaped, *pkgbuild;
 
     aurpkg = alpm_list_getdata(pkglist);
+    escaped = url_encode(curl, aurpkg->urlpath, "/");
+    cwr_asprintf(&pburl, AUR_BASE_URL, cfg.proto, escaped);
+    slash = strrchr(pburl, '/');
+    memcpy(slash + 1, "PKGBUILD", 8);
+    *(slash + 9) = '\0';
 
-    cwr_asprintf(&pburl, AUR_PKGBUILD_PATH, cfg.proto, escaped);
     pkgbuild = curl_get_url_as_buffer(curl, pburl);
+    free(escaped);
     free(pburl);
 
     alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
@@ -2055,6 +2064,24 @@ void *thread_pool(void *arg) { /* {{{ */
   curl_easy_cleanup(curl);
 
   return ret;
+} /* }}} */
+
+static char *url_encode(CURL *curl, char *in, const char *delim) { /* {{{ */
+  char *tok, *escaped;
+  char buf[128] = { 0 };
+
+  if (!delim) {
+    return curl_easy_escape(curl, in, 0);
+  }
+
+  while ((tok = strsep(&in, delim))) {
+    escaped = curl_easy_escape(curl, tok, 0);
+    strcat(buf, escaped);
+    curl_free(escaped);
+    strcat(buf, delim);
+  }
+
+  return strndup(buf, strlen(buf) - 1);
 } /* }}} */
 
 void usage() { /* {{{ */
