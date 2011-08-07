@@ -277,7 +277,7 @@ static void *task_download(CURL*, void*);
 static void *task_query(CURL*, void*);
 static void *task_update(CURL*, void*);
 static void *thread_pool(void*);
-static char *url_encode(CURL*, char*, const char*);
+static char *url_encode(CURL*, char*, int, const char*);
 static void usage(void);
 static void version(void);
 static size_t yajl_parse_stream(void*, size_t, size_t, void*);
@@ -1820,7 +1820,7 @@ void *task_download(CURL *curl, void *arg) { /* {{{ */
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 
-  escaped = url_encode(curl, ((struct aurpkg_t*)(queryresult->data))->urlpath, "/");
+  escaped = url_encode(curl, ((struct aurpkg_t*)(queryresult->data))->urlpath, 0, "/");
   cwr_asprintf(&url, AUR_BASE_URL, cfg.proto, escaped);
   curl_easy_setopt(curl, CURLOPT_URL, url);
   free(escaped);
@@ -1915,7 +1915,7 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, yajl_parse_stream);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, yajl_hand);
 
-  escaped = url_encode(curl, (char*)argstr, NULL);
+  escaped = url_encode(curl, (char*)argstr, span, NULL);
   if (cfg.opmask & OP_SEARCH) {
     cwr_asprintf(&url, AUR_RPC_URL, cfg.proto, AUR_QUERY_TYPE_SEARCH, escaped);
   } else if (cfg.opmask & OP_MSEARCH) {
@@ -1950,7 +1950,7 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
     char *pburl, *slash, *escaped, *pkgbuild;
 
     aurpkg = alpm_list_getdata(pkglist);
-    escaped = url_encode(curl, aurpkg->urlpath, "/");
+    escaped = url_encode(curl, aurpkg->urlpath, 0, "/");
     cwr_asprintf(&pburl, AUR_BASE_URL, cfg.proto, escaped);
     slash = strrchr(pburl, '/');
     memcpy(slash + 1, "PKGBUILD", 8);
@@ -2066,12 +2066,12 @@ void *thread_pool(void *arg) { /* {{{ */
   return ret;
 } /* }}} */
 
-static char *url_encode(CURL *curl, char *in, const char *delim) { /* {{{ */
+static char *url_encode(CURL *curl, char *in, int len, const char *delim) { /* {{{ */
   char *tok, *escaped;
   char buf[128] = { 0 };
 
   if (!delim) {
-    return curl_easy_escape(curl, in, 0);
+    return curl_easy_escape(curl, in, len);
   }
 
   while ((tok = strsep(&in, delim))) {
