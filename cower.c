@@ -1639,7 +1639,7 @@ int resolve_dependencies(CURL *curl, const char *pkgname) { /* {{{ */
     const char *depend = alpm_list_getdata(i);
     char *sanitized = strdup(depend);
 
-    *(sanitized + strcspn(sanitized, "<>=")) = '\0';
+    sanitized[strcspn(sanitized, "<>=")] = '\0';
 
     pthread_mutex_lock(&alock);
     if (!alpm_list_find_str(cfg.targets, sanitized)) {
@@ -1883,7 +1883,7 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
       span = strcspn(argstr, REGEX_CHARS);
 
       /* given 'cow?', we can't include w in the search */
-      if (*(argstr + span) == '?' || *(argstr + span) == '*') {
+      if (argstr[span] == '?' || argstr[span] == '*') {
         span--;
       }
 
@@ -1954,7 +1954,7 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
     cwr_asprintf(&pburl, AUR_BASE_URL, cfg.proto, escaped);
     slash = strrchr(pburl, '/');
     memcpy(slash + 1, "PKGBUILD", 8);
-    *(slash + 9) = '\0';
+    slash[9] = '\0';
 
     pkgbuild = curl_get_url_as_buffer(curl, pburl);
     free(escaped);
