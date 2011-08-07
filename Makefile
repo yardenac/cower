@@ -11,7 +11,7 @@ PREFIX    ?= /usr/local
 MANPREFIX ?= ${PREFIX}/share/man
 
 CPPFLAGS  := -DCOWER_VERSION=\"${VERSION}\" ${CPPFLAGS}
-CFLAGS    := --std=c99 -g -pedantic -Wall -Wextra -Werror ${CPPFLAGS} ${CFLAGS}
+CFLAGS    := --std=c99 -g -pedantic -Wall -Wextra -Werror ${CFLAGS}
 LDFLAGS   := -lcurl -lalpm -lyajl -larchive -pthread ${LDFLAGS}
 
 all: ${OUT} doc
