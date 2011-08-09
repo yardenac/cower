@@ -12,7 +12,7 @@ MANPREFIX ?= ${PREFIX}/share/man
 
 CPPFLAGS  := -DCOWER_VERSION=\"${VERSION}\" ${CPPFLAGS}
 CFLAGS    := --std=c99 -g -pedantic -Wall -Wextra -Werror ${CFLAGS}
-LDFLAGS   := -lcurl -lalpm -lyajl -larchive -pthread ${LDFLAGS}
+LDFLAGS   := -lcurl -lalpm -lyajl -larchive -lcrypto -pthread ${LDFLAGS}
 
 all: ${OUT} doc
 

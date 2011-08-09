@@ -816,7 +816,11 @@ void indentprint(const char *str, int indent) { /* {{{ */
       }
       continue;
     }
+#ifdef __clang__
+    printf("%lc", *p);
+#else /* assume GCC */
     printf("%lc", (wint_t)*p);
+#endif
     cidx += wcwidth(*p);
     p++;
   }
