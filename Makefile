@@ -52,10 +52,9 @@ dist: clean
 	tar czf cower-${VERSION}.tar.gz cower-${VERSION}
 	rm -rf cower-${VERSION}
 
-distcheck: clean dist cower
+distcheck: dist
 	tar xf cower-${VERSION}.tar.gz
-	cd cower-${VERSION} && \
-		${MAKE}
+	${MAKE} -C cower-${VERSION}
 	rm -rf cower-${VERSION}
 
 clean:
