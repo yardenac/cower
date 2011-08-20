@@ -82,6 +82,8 @@
 #define AUR_LICENSE           "License"
 #define AUR_VOTES             "NumVotes"
 #define AUR_OOD               "OutOfDate"
+#define AUR_FIRSTSUB          "FirstSubmitted"
+#define AUR_LASTMOD           "LastModified"
 
 #define PKGBUILD_DEPENDS      "depends=("
 #define PKGBUILD_MAKEDEPENDS  "makedepends=("
@@ -103,6 +105,10 @@
 #define PKG_LICENSE           "License"
 #define PKG_OOD               "Out of Date"
 #define PKG_DESC              "Description"
+#define PKG_MAINT             "Maintainer"
+#define PKG_FIRSTSUB          "Submitted"
+#define PKG_LASTMOD           "Last Modified"
+#define PKG_TIMEFMT           "%c"
 
 #define INFO_INDENT           17
 #define SRCH_INDENT           4
@@ -191,6 +197,7 @@ struct strings_t {
 struct aurpkg_t {
   const char *id;
   const char *name;
+  const char *maint;
   const char *ver;
   const char *desc;
   const char *url;
@@ -199,6 +206,8 @@ struct aurpkg_t {
   char *urlpath;
   int cat;
   int ood;
+  time_t firstsub;
+  time_t lastmod;
 
   alpm_list_t *depends;
   alpm_list_t *makedepends;
@@ -504,6 +513,7 @@ void aurpkg_free(void *pkg) { /* {{{ */
 
   FREE(it->id);
   FREE(it->name);
+  FREE(it->maint);
   FREE(it->ver);
   FREE(it->desc);
   FREE(it->url);
@@ -846,6 +856,7 @@ int json_start_map(void *ctx) { /* {{{ */
 int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
   struct yajl_parser_t *parse_struct = (struct yajl_parser_t*)ctx;
   const char *val = (const char*)data;
+  char buffer[32];
 
   if (STREQ(parse_struct->curkey, AUR_QUERY_TYPE) &&
       STR_STARTS_WITH(val, AUR_QUERY_ERROR)) {
@@ -856,6 +867,8 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
     parse_struct->aurpkg->id = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, NAME)) {
     parse_struct->aurpkg->name = strndup(val, size);
+  } else if (STREQ(parse_struct->curkey, PKG_MAINT)) {
+    parse_struct->aurpkg->maint = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, VERSION)) {
     parse_struct->aurpkg->ver = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, AUR_CAT)) {
@@ -872,6 +885,12 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
     parse_struct->aurpkg->votes = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, AUR_OOD)) {
     parse_struct->aurpkg->ood = strncmp(val, "1", 1) == 0 ? 1 : 0;
+  } else if (STREQ(parse_struct->curkey, AUR_FIRSTSUB)) {
+    snprintf(buffer, size + 1, "%s", val);
+    parse_struct->aurpkg->firstsub = strtol(buffer, NULL, 10);
+  } else if (STREQ(parse_struct->curkey, AUR_LASTMOD)) {
+    snprintf(buffer, size + 1, "%s", val);
+    parse_struct->aurpkg->lastmod = strtol(buffer, NULL, 10);
   }
 
   return 1;
@@ -1441,6 +1460,10 @@ void print_pkg_formatted(struct aurpkg_t *pkg) { /* {{{ */
       p += len + 1;
       switch (*p) {
         /* simple attributes */
+        case 'a':
+          snprintf(buf, 64, "%ld", pkg->lastmod);
+          printf(fmt, buf);
+          break;
         case 'c':
           printf(fmt, aur_cat[pkg->cat]);
           break;
@@ -1453,6 +1476,9 @@ void print_pkg_formatted(struct aurpkg_t *pkg) { /* {{{ */
         case 'l':
           printf(fmt, pkg->lic);
           break;
+        case 'm':
+          printf(fmt, pkg->maint);
+          break;
         case 'n':
           printf(fmt, pkg->name);
           break;
@@ -1461,6 +1487,10 @@ void print_pkg_formatted(struct aurpkg_t *pkg) { /* {{{ */
           break;
         case 'p':
           snprintf(buf, 64, AUR_PKG_URL_FORMAT "%s", cfg.proto, pkg->id);
+          printf(fmt, buf);
+          break;
+        case 's':
+          snprintf(buf, 64, "%ld", pkg->firstsub);
           printf(fmt, buf);
           break;
         case 't':
@@ -1514,6 +1544,8 @@ void print_pkg_formatted(struct aurpkg_t *pkg) { /* {{{ */
 
 void print_pkg_info(struct aurpkg_t *pkg) { /* {{{ */
   pmpkg_t *ipkg;
+  char datestring[42];
+  struct tm *ts;
 
   printf(PKG_REPO "     : %saur%s\n", colstr->repo, colstr->nc);
   printf(NAME "           : %s%s%s", colstr->pkg, pkg->name, colstr->nc);
@@ -1552,12 +1584,22 @@ void print_pkg_info(struct aurpkg_t *pkg) { /* {{{ */
   printf(PKG_CAT "       : %s\n"
          PKG_LICENSE "        : %s\n"
          PKG_NUMVOTES "          : %s\n"
-         PKG_OOD "    : %s%s%s\n"
-         PKG_DESC "    : ",
+         PKG_OOD "    : %s%s%s\n",
          aur_cat[pkg->cat], pkg->lic, pkg->votes,
          pkg->ood ? colstr->ood : colstr->utd,
          pkg->ood ? "Yes" : "No", colstr->nc);
 
+  printf(PKG_MAINT "     : %s\n", pkg->maint);
+
+  ts = localtime(&pkg->firstsub);
+  strftime(datestring, 42, PKG_TIMEFMT, ts);
+  printf(PKG_FIRSTSUB "      : %s\n", datestring);
+
+  ts = localtime(&pkg->lastmod);
+  strftime(datestring, 42, PKG_TIMEFMT, ts);
+  printf(PKG_LASTMOD "  : %s\n", datestring);
+
+  printf(PKG_DESC "    : ");
   indentprint(pkg->desc, INFO_INDENT);
   printf("\n\n");
 } /* }}} */

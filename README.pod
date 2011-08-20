@@ -143,6 +143,8 @@ Display version and exit.
 When the B<--format> option is used with the --search, --msearch, or --info
 operations, the following sequences are interpreted within the formatter::
 
+  %a    last modified
+
   %c    category
 
   %d    description
@@ -151,11 +153,15 @@ operations, the following sequences are interpreted within the formatter::
 
   %l    license
 
+  %m    maintainer
+
   %n    name
 
   %o    votes
 
   %p    AUR page
+
+  %s    submission date
 
   %t    out of date (yes/no)
 
