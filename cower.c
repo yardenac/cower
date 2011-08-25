@@ -377,14 +377,12 @@ alpm_handle_t *alpm_init() { /* {{{ */
   }
 
   while (fgets(line, PATH_MAX, fp)) {
-    strtrim(line);
-
-    if (!strlen(line) || line[0] == '#') {
-      continue;
-    }
     if ((ptr = strchr(line, '#'))) {
       *ptr = '\0';
-      strtrim(ptr);
+    }
+    strtrim(line);
+    if (!strlen(line)) {
+      continue;
     }
 
     if (line[0] == '[' && line[strlen(line) - 1] == ']') {
