@@ -404,7 +404,7 @@ alpm_handle_t *alpm_init() { /* {{{ */
       strtrim(key);
       strtrim(ptr);
       if (STREQ(key, "IgnorePkg")) {
-        for (token = strtok(ptr, " "); token; token = strtok(NULL, ",")) {
+        for (token = strtok(ptr, "\t\n "); token; token = strtok(NULL, "\t\n ")) {
           if (!alpm_list_find_str(cfg.ignore.pkgs, token)) {
             cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
             cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
