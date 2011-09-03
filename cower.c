@@ -405,10 +405,8 @@ alpm_handle_t *alpm_init() { /* {{{ */
       strtrim(ptr);
       if (STREQ(key, "IgnorePkg")) {
         for (token = strtok(ptr, "\t\n "); token; token = strtok(NULL, "\t\n ")) {
-          if (!alpm_list_find_str(cfg.ignore.pkgs, token)) {
-            cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
-            cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
-          }
+          cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
+          cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
         }
       }
     }
@@ -1069,17 +1067,13 @@ int parse_configfile() { /* {{{ */
       cfg.proto = "http";
     } else if (STREQ(key, "IgnoreRepo")) {
       for (key = strtok(val, " "); key; key = strtok(NULL, " ")) {
-        if (!alpm_list_find_str(cfg.ignore.repos, key)) {
-          cwr_printf(LOG_DEBUG, "ignoring repo: %s\n", key);
-          cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(key));
-        }
+        cwr_printf(LOG_DEBUG, "ignoring repo: %s\n", key);
+        cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(key));
       }
     } else if (STREQ(key, "IgnorePkg")) {
       for (key = strtok(val, " "); key; key = strtok(NULL, " ")) {
-        if (!alpm_list_find_str(cfg.ignore.pkgs, key)) {
-          cwr_printf(LOG_DEBUG, "ignoring package: %s\n", key);
-          cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
-        }
+        cwr_printf(LOG_DEBUG, "ignoring package: %s\n", key);
+        cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
       }
     } else if (STREQ(key, "TargetDir")) {
       if (val && !cfg.dlpath) {
@@ -1251,10 +1245,8 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
         break;
       case OP_IGNOREPKG:
         for (token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
-          if (!alpm_list_find_str(cfg.ignore.pkgs, token)) {
-            cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
-            cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
-          }
+          cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
+          cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
         }
         break;
       case OP_IGNOREREPO:
@@ -1262,10 +1254,8 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
           cfg.skiprepos = 1;
         } else {
           for (token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
-            if (!alpm_list_find_str(cfg.ignore.repos, token)) {
-              cwr_printf(LOG_DEBUG, "ignoring repos: %s\n", token);
-              cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(token));
-            }
+            cwr_printf(LOG_DEBUG, "ignoring repos: %s\n", token);
+            cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(token));
           }
         }
         break;
