@@ -1292,12 +1292,10 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
     return 3;
   }
 
+#define NOT_EXCL(val) (cfg.opmask & (val) && (cfg.opmask & ~(val)))
   /* check for invalid operation combos */
-  if (((cfg.opmask & OP_INFO) && (cfg.opmask & ~OP_INFO)) ||
-     ((cfg.opmask & OP_SEARCH) && (cfg.opmask & ~OP_SEARCH)) ||
-     ((cfg.opmask & OP_MSEARCH) && (cfg.opmask & ~OP_MSEARCH)) ||
-     ((cfg.opmask & (OP_UPDATE|OP_DOWNLOAD)) && (cfg.opmask & ~(OP_UPDATE|OP_DOWNLOAD)))) {
-
+  if (NOT_EXCL(OP_INFO) || NOT_EXCL(OP_SEARCH) || NOT_EXCL(OP_MSEARCH) ||
+      NOT_EXCL(OP_UPDATE|OP_DOWNLOAD)) {
     fprintf(stderr, "error: invalid operation\n");
     return 2;
   }
