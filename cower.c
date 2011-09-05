@@ -303,7 +303,7 @@ static size_t yajl_parse_stream(void*, size_t, size_t, void*);
 /* }}} */
 
 /* runtime configuration {{{ */
-struct {
+static struct {
   char *dlpath;
   const char *delim;
   const char *format;
@@ -2172,7 +2172,6 @@ int main(int argc, char *argv[]) {
   setlocale(LC_ALL, "");
 
   /* initialize config */
-  memset(&cfg, 0, sizeof cfg);
   cfg.color = cfg.maxthreads = cfg.timeout = UNSET;
   cfg.delim = LIST_DELIM;
   cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO; 
