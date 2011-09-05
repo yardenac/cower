@@ -380,8 +380,7 @@ alpm_handle_t *alpm_init() { /* {{{ */
     if ((ptr = strchr(line, '#'))) {
       *ptr = '\0';
     }
-    strtrim(line);
-    if (!strlen(line)) {
+    if(*strtrim(line) == '\0') {
       continue;
     }
 
