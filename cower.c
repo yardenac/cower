@@ -2166,7 +2166,7 @@ int main(int argc, char *argv[]) {
   /* initialize config */
   cfg.color = cfg.maxthreads = cfg.timeout = UNSET;
   cfg.delim = LIST_DELIM;
-  cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO; 
+  cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
   cfg.proto = "https";
 
   ret = parse_options(argc, argv);
