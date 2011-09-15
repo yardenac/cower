@@ -624,14 +624,10 @@ CURL *curl_init_easy_handle(CURL *handle) { /* {{{ */
 
 char *curl_get_url_as_buffer(CURL *curl, const char *url) { /* {{{ */
   long httpcode;
-  struct response_t response;
+  struct response_t response = { NULL, 0 };
   CURLcode curlstat;
 
   curl = curl_init_easy_handle(curl);
-
-  response.data = NULL;
-  response.size = 0;
-
   curl_easy_setopt(curl, CURLOPT_URL, url);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -1800,7 +1796,7 @@ void *task_download(CURL *curl, void *arg) { /* {{{ */
   char *url, *escaped;
   int ret;
   long httpcode;
-  struct response_t response;
+  struct response_t response = { 0, 0 };
   struct stat st;
   static pthread_mutex_t alpmlock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1833,9 +1829,6 @@ void *task_download(CURL *curl, void *arg) { /* {{{ */
     alpm_list_free(queryresult);
     return NULL;
   }
-
-  response.data = NULL;
-  response.size = 0;
 
   curl_easy_setopt(curl, CURLOPT_ENCODING, "identity"); /* disable compression */
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
