@@ -313,12 +313,12 @@ static struct {
   loglevel_t logmask;
 
   int color;
-  int extinfo;
-  int force;
-  int getdeps;
+  int extinfo:1;
+  int force:1;
+  int getdeps:1;
+  int quiet:1;
+  int skiprepos:1;
   int maxthreads;
-  int quiet;
-  int skiprepos;
   long timeout;
 
   alpm_list_t *targets;
@@ -1177,14 +1177,14 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
         if (!(cfg.opmask & OP_INFO)) {
           cfg.opmask |= OP_INFO;
         } else {
-          cfg.extinfo = 1;
+          cfg.extinfo |= 1;
         }
         break;
       case 'd':
         if (!(cfg.opmask & OP_DOWNLOAD)) {
           cfg.opmask |= OP_DOWNLOAD;
         } else {
-          cfg.getdeps = 1;
+          cfg.getdeps |= 1;
         }
         break;
       case 'm':
@@ -1212,13 +1212,13 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
         }
         break;
       case 'f':
-        cfg.force = 1;
+        cfg.force |= 1;
         break;
       case 'h':
         usage();
         return 1;
       case 'q':
-        cfg.quiet = 1;
+        cfg.quiet |= 1;
         break;
       case 't':
         cfg.dlpath = strdup(optarg);
@@ -1243,7 +1243,7 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
         break;
       case OP_IGNOREREPO:
         if (!optarg) {
-          cfg.skiprepos = 1;
+          cfg.skiprepos |= 1;
         } else {
           for (token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
             cwr_printf(LOG_DEBUG, "ignoring repos: %s\n", token);
