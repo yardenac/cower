@@ -950,7 +950,7 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
     for (token = array; token <= arrayend; token++) {
       if (*token == '\'' || *token == '\"') {
         token++;
-        ptr = strchr(token, *(token - 1));
+        ptr = memchr(token, *(token - 1), arrayend - token);
         *ptr = '\0';
       } else if (isalpha(*token)) {
         ptr = token;
@@ -1313,9 +1313,15 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) { /* {{{ */
     char *arrayend;
     int depth = 1, type = 0;
     alpm_list_t **deplist;
+    size_t linelen;
 
     strtrim(++lineptr);
-    if (*lineptr == '#' || strlen(lineptr) == 0) {
+    if (*lineptr == '#') {
+      continue;
+    }
+
+    linelen = strlen(lineptr);
+    if(!linelen) {
       continue;
     }
 
@@ -1337,7 +1343,7 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) { /* {{{ */
     }
 
     if (deplist) {
-      char *arrayptr = strchr(lineptr, '(') + 1;
+      char *arrayptr = (char*)memchr(lineptr, '(', linelen) + 1;
       for (arrayend = arrayptr; depth; arrayend++) {
         switch (*arrayend) {
           case ')':
