@@ -318,6 +318,7 @@ static struct {
   int getdeps:1;
   int quiet:1;
   int skiprepos:1;
+  int secure:1;
   int maxthreads;
   long timeout;
 
@@ -894,7 +895,7 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
 void openssl_crypto_cleanup() { /* {{{ */
   int i;
 
-  if (!STREQ(cfg.proto, "https")) {
+  if (!cfg.secure) {
     return;
   }
 
@@ -1056,6 +1057,7 @@ int parse_configfile() { /* {{{ */
     /* colors are not initialized in this section, so usage of cwr_printf
      * functions is verboten unless we're using loglevel_t LOG_DEBUG */
     if (STREQ(key, "NoSSL")) {
+      cfg.secure &= 0;
       cfg.proto = "http";
     } else if (STREQ(key, "IgnoreRepo")) {
       for (key = strtok(val, " "); key; key = strtok(NULL, " ")) {
@@ -1255,6 +1257,7 @@ int parse_options(int argc, char *argv[]) { /* {{{ */
         cfg.delim = optarg;
         break;
       case OP_NOSSL:
+        cfg.secure &= 0;
         cfg.proto = "http";
         break;
       case OP_THREADS:
@@ -2164,6 +2167,7 @@ int main(int argc, char *argv[]) {
   cfg.color = cfg.maxthreads = cfg.timeout = UNSET;
   cfg.delim = LIST_DELIM;
   cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
+  cfg.secure |= 1;
   cfg.proto = "https";
 
   ret = parse_options(argc, argv);
@@ -2195,7 +2199,7 @@ int main(int argc, char *argv[]) {
   }
 
   cwr_printf(LOG_DEBUG, "initializing curl\n");
-  if (STREQ(cfg.proto, "https")) {
+  if (cfg.secure) {
     ret = curl_global_init(CURL_GLOBAL_SSL);
     openssl_crypto_init();
   } else {
