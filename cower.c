@@ -276,7 +276,7 @@ static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
 static void openssl_crypto_cleanup(void);
 static void openssl_crypto_init(void);
-static unsigned long openssl_thread_id(void);
+static unsigned long openssl_thread_id(void) __attribute__ ((const));
 static void openssl_thread_cb(int, int, const char*, int);
 static alpm_list_t *parse_bash_array(alpm_list_t*, char*, pkgdetail_t);
 static int parse_configfile(void);
@@ -933,11 +933,8 @@ void openssl_thread_cb(int mode, int type, const char *file, int line) { /* {{{ 
   }
 } /* }}} */
 
-unsigned long openssl_thread_id(void) { /* {{{ */
-  unsigned long ret;
-
-  ret = (unsigned long)pthread_self();
-  return(ret);
+unsigned long openssl_thread_id() { /* {{{ */
+  return pthread_self();
 } /* }}} */
 
 alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t type) { /* {{{ */
