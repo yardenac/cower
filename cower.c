@@ -1913,6 +1913,10 @@ void *task_query(CURL *curl, void *arg) { /* {{{ */
       /* a string inside [] or {} cannot be a valid span */
       if (strchr("[{", *argstr)) {
         argstr = strpbrk(argstr + span, "]}");
+        if (!argstr) {
+          cwr_fprintf(stderr, LOG_ERROR, "invalid regular expression: %s\n", (const char*)arg);
+          return NULL;
+        }
         continue;
       }
 
