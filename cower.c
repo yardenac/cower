@@ -205,14 +205,14 @@ struct strings_t {
 };
 
 struct aurpkg_t {
-  const char *id;
+  int id;
   const char *name;
   const char *maint;
   const char *ver;
   const char *desc;
   const char *url;
   const char *lic;
-  const char *votes;
+  int votes;
   char *urlpath;
   int cat;
   int ood;
@@ -507,14 +507,12 @@ void aurpkg_free(void *pkg) { /* {{{ */
 
   it = (struct aurpkg_t*)pkg;
 
-  FREE(it->id);
   FREE(it->name);
   FREE(it->maint);
   FREE(it->ver);
   FREE(it->desc);
   FREE(it->url);
   FREE(it->lic);
-  FREE(it->votes);
 
   FREELIST(it->depends);
   FREELIST(it->makedepends);
@@ -860,7 +858,8 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
   }
 
   if (STREQ(parse_struct->curkey, AUR_ID)) {
-    parse_struct->aurpkg->id = strndup(val, size);
+    snprintf(buffer, size + 1, "%s", val);
+    parse_struct->aurpkg->id = strtol(buffer, NULL, 10);
   } else if (STREQ(parse_struct->curkey, NAME)) {
     parse_struct->aurpkg->name = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, PKG_MAINT)) {
@@ -868,7 +867,8 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
   } else if (STREQ(parse_struct->curkey, VERSION)) {
     parse_struct->aurpkg->ver = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, AUR_CAT)) {
-    parse_struct->aurpkg->cat = atoi(val);
+    snprintf(buffer, size + 1, "%s", val);
+    parse_struct->aurpkg->cat = strtol(buffer, NULL, 10);
   } else if (STREQ(parse_struct->curkey, AUR_DESC)) {
     parse_struct->aurpkg->desc = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, URL)) {
@@ -878,7 +878,8 @@ int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
   } else if (STREQ(parse_struct->curkey, AUR_LICENSE)) {
     parse_struct->aurpkg->lic = strndup(val, size);
   } else if (STREQ(parse_struct->curkey, AUR_VOTES)) {
-    parse_struct->aurpkg->votes = strndup(val, size);
+    snprintf(buffer, size + 1, "%s", val);
+    parse_struct->aurpkg->votes = strtol(buffer, NULL, 10);
   } else if (STREQ(parse_struct->curkey, AUR_OOD)) {
     parse_struct->aurpkg->ood = strncmp(val, "1", 1) == 0 ? 1 : 0;
   } else if (STREQ(parse_struct->curkey, AUR_FIRSTSUB)) {
@@ -1462,7 +1463,8 @@ void print_pkg_formatted(struct aurpkg_t *pkg) { /* {{{ */
           printf(fmt, pkg->desc);
           break;
         case 'i':
-          printf(fmt, pkg->id);
+          snprintf(buf, 64, "%d", pkg->id);
+          printf(fmt, buf);
           break;
         case 'l':
           printf(fmt, pkg->lic);
@@ -1474,10 +1476,11 @@ void print_pkg_formatted(struct aurpkg_t *pkg) { /* {{{ */
           printf(fmt, pkg->name);
           break;
         case 'o':
-          printf(fmt, pkg->votes);
+          snprintf(buf, 64, "%d", pkg->votes);
+          printf(fmt, buf);
           break;
         case 'p':
-          snprintf(buf, 64, AUR_PKG_URL_FORMAT "%s", cfg.proto, pkg->id);
+          snprintf(buf, 64, AUR_PKG_URL_FORMAT "%d", cfg.proto, pkg->id);
           printf(fmt, buf);
           break;
         case 's':
@@ -1554,7 +1557,7 @@ void print_pkg_info(struct aurpkg_t *pkg) { /* {{{ */
   printf(VERSION "        : %s%s%s\n",
       pkg->ood ? colstr->ood : colstr->utd, pkg->ver, colstr->nc);
   printf(URL "            : %s%s%s\n", colstr->url, pkg->url, colstr->nc);
-  printf(PKG_AURPAGE "       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
+  printf(PKG_AURPAGE "       : %s" AUR_PKG_URL_FORMAT "%d%s\n",
       colstr->url, cfg.proto, pkg->id, colstr->nc);
 
   print_extinfo_list(pkg->depends, PKG_DEPENDS, LIST_DELIM, 1);
@@ -1574,7 +1577,7 @@ void print_pkg_info(struct aurpkg_t *pkg) { /* {{{ */
 
   printf(PKG_CAT "       : %s\n"
          PKG_LICENSE "        : %s\n"
-         PKG_NUMVOTES "          : %s\n"
+         PKG_NUMVOTES "          : %d\n"
          PKG_OOD "    : %s%s%s\n",
          aur_cat[pkg->cat], pkg->lic, pkg->votes,
          pkg->ood ? colstr->ood : colstr->utd,
@@ -1600,7 +1603,7 @@ void print_pkg_search(struct aurpkg_t *pkg) { /* {{{ */
     printf("%s%s%s\n", colstr->pkg, pkg->name, colstr->nc);
   } else {
     alpm_pkg_t *ipkg;
-    printf("%saur/%s%s%s %s%s%s%s (%s)", colstr->repo, colstr->nc, colstr->pkg,
+    printf("%saur/%s%s%s %s%s%s%s (%d)", colstr->repo, colstr->nc, colstr->pkg,
         pkg->name, pkg->ood ? colstr->ood : colstr->utd, pkg->ver,
         NCFLAG(pkg->ood, " <!>"), colstr->nc, pkg->votes);
     if ((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
