@@ -230,7 +230,8 @@ struct aurpkg_t {
 struct yajl_parser_t {
   alpm_list_t *pkglist;
   struct aurpkg_t *aurpkg;
-  char curkey[32];
+  char key[32];
+  size_t keysz;
   int json_depth;
 };
 
@@ -258,7 +259,6 @@ static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*);
 static int aurpkg_cmp(const void*, const void*);
 static void aurpkg_free(void*);
-static struct aurpkg_t *aurpkg_new(void);
 static CURL *curl_init_easy_handle(CURL*);
 static char *curl_get_url_as_buffer(CURL*, const char*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
@@ -522,14 +522,6 @@ void aurpkg_free(void *pkg) { /* {{{ */
   FREELIST(it->replaces);
 
   FREE(it);
-} /* }}} */
-
-struct aurpkg_t *aurpkg_new() { /* {{{ */
-  struct aurpkg_t *pkg;
-
-  CALLOC(pkg, 1, sizeof *pkg, return NULL);
-
-  return pkg;
 } /* }}} */
 
 int cwr_asprintf(char **string, const char *format, ...) { /* {{{ */
@@ -818,76 +810,78 @@ void indentprint(const char *str, int indent) { /* {{{ */
 } /* }}} */
 
 int json_end_map(void *ctx) { /* {{{ */
-  struct yajl_parser_t *parse_struct = (struct yajl_parser_t*)ctx;
+  struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
 
-  if (--parse_struct->json_depth > 0) {
-    parse_struct->pkglist = alpm_list_add_sorted(parse_struct->pkglist,
-        parse_struct->aurpkg, aurpkg_cmp);
+  p->json_depth--;
+  if (p->json_depth > 0) {
+    p->pkglist = alpm_list_add_sorted(p->pkglist, p->aurpkg, aurpkg_cmp);
   }
 
   return 1;
 } /* }}} */
 
 int json_map_key(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
-  struct yajl_parser_t *parse_struct = (struct yajl_parser_t*)ctx;
+  struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
 
-  strncpy(parse_struct->curkey, (const char*)data, size);
-  parse_struct->curkey[size] = '\0';
+  p->keysz = size;
+  memcpy(p->key, (const char*)data, size);
+  p->key[size] = '\0';
 
   return 1;
 } /* }}} */
 
 int json_start_map(void *ctx) { /* {{{ */
-  struct yajl_parser_t *parse_struct = (struct yajl_parser_t*)ctx;
+  struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
 
-  if (parse_struct->json_depth++ >= 1) {
-    parse_struct->aurpkg = aurpkg_new();
+  p->json_depth++;
+  if (p->json_depth >= 1) {
+    p->aurpkg = calloc(1, sizeof(struct aurpkg_t));
   }
 
   return 1;
 } /* }}} */
 
 int json_string(void *ctx, const unsigned char *data, size_t size) { /* {{{ */
-  struct yajl_parser_t *parse_struct = (struct yajl_parser_t*)ctx;
+  struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
   const char *val = (const char*)data;
   char buffer[32];
 
-  if (STREQ(parse_struct->curkey, AUR_QUERY_TYPE) &&
-      STR_STARTS_WITH(val, AUR_QUERY_ERROR)) {
+#define KEY_IS(k) (memcmp(p->key, (k), p->keysz) == 0)
+  if (KEY_IS(AUR_QUERY_TYPE) && STR_STARTS_WITH(val, AUR_QUERY_ERROR)) {
     return 1;
   }
 
-  if (STREQ(parse_struct->curkey, AUR_ID)) {
+  if (KEY_IS(AUR_ID)) {
     snprintf(buffer, size + 1, "%s", val);
-    parse_struct->aurpkg->id = strtol(buffer, NULL, 10);
-  } else if (STREQ(parse_struct->curkey, NAME)) {
-    parse_struct->aurpkg->name = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, PKG_MAINT)) {
-    parse_struct->aurpkg->maint = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, VERSION)) {
-    parse_struct->aurpkg->ver = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, AUR_CAT)) {
+    p->aurpkg->id = strtol(buffer, NULL, 10);
+  } else if (KEY_IS(NAME)) {
+    p->aurpkg->name = strndup(val, size);
+  } else if (KEY_IS(PKG_MAINT)) {
+    p->aurpkg->maint = strndup(val, size);
+  } else if (KEY_IS(VERSION)) {
+    p->aurpkg->ver = strndup(val, size);
+  } else if (KEY_IS(AUR_CAT)) {
     snprintf(buffer, size + 1, "%s", val);
-    parse_struct->aurpkg->cat = strtol(buffer, NULL, 10);
-  } else if (STREQ(parse_struct->curkey, AUR_DESC)) {
-    parse_struct->aurpkg->desc = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, URL)) {
-    parse_struct->aurpkg->url = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, URLPATH)) {
-    parse_struct->aurpkg->urlpath = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, AUR_LICENSE)) {
-    parse_struct->aurpkg->lic = strndup(val, size);
-  } else if (STREQ(parse_struct->curkey, AUR_VOTES)) {
+    p->aurpkg->cat = strtol(buffer, NULL, 10);
+  } else if (KEY_IS(AUR_DESC)) {
+    p->aurpkg->desc = strndup(val, size);
+  } else if (KEY_IS(URL)) {
+    p->aurpkg->url = strndup(val, size);
+  } else if (KEY_IS(URLPATH)) {
+    p->aurpkg->urlpath = strndup(val, size);
+  } else if (KEY_IS(AUR_LICENSE)) {
+    p->aurpkg->lic = strndup(val, size);
+  } else if (KEY_IS(AUR_VOTES)) {
     snprintf(buffer, size + 1, "%s", val);
-    parse_struct->aurpkg->votes = strtol(buffer, NULL, 10);
-  } else if (STREQ(parse_struct->curkey, AUR_OOD)) {
-    parse_struct->aurpkg->ood = strncmp(val, "1", 1) == 0 ? 1 : 0;
-  } else if (STREQ(parse_struct->curkey, AUR_FIRSTSUB)) {
+    p->aurpkg->votes = strtol(buffer, NULL, 10);
+  } else if (KEY_IS(AUR_OOD)) {
+    p->aurpkg->ood = strncmp(val, "1", 1) == 0 ? 1 : 0;
+  } else if (KEY_IS(AUR_FIRSTSUB)) {
     snprintf(buffer, size + 1, "%s", val);
-    parse_struct->aurpkg->firstsub = strtol(buffer, NULL, 10);
-  } else if (STREQ(parse_struct->curkey, AUR_LASTMOD)) {
+    p->aurpkg->firstsub = strtol(buffer, NULL, 10);
+  } else if (KEY_IS(AUR_LASTMOD)) {
     snprintf(buffer, size + 1, "%s", val);
-    parse_struct->aurpkg->lastmod = strtol(buffer, NULL, 10);
+    p->aurpkg->lastmod = strtol(buffer, NULL, 10);
   }
 
   return 1;
