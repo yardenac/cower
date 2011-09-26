@@ -777,7 +777,7 @@ void indentprint(const char *str, int indent) /* {{{ */
 	}
 
 	len = strlen(str) + 1;
-	CALLOC(wcstr, len, sizeof *wcstr, return);
+	CALLOC(wcstr, len, sizeof(wchar_t), return);
 	len = mbstowcs(wcstr, str, len);
 	p = wcstr;
 	cidx = indent;
@@ -1773,7 +1773,7 @@ int set_working_dir() /* {{{ */
 
 int strings_init() /* {{{ */
 {
-	MALLOC(colstr, sizeof *colstr, return 1);
+	MALLOC(colstr, sizeof(struct strings_t), return 1);
 
 	if(cfg.color > 0) {
 		colstr->error = BOLDRED "::" NC;
@@ -1969,7 +1969,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 		argstr = arg;
 	}
 
-	MALLOC(parse_struct, sizeof *parse_struct, return NULL);
+	MALLOC(parse_struct, sizeof(struct yajl_parser_t), return NULL);
 	parse_struct->pkglist = NULL;
 	parse_struct->json_depth = 0;
 	yajl_hand = yajl_alloc(&callbacks, NULL, (void*)parse_struct);
@@ -2285,7 +2285,7 @@ int main(int argc, char *argv[]) {
 		num_threads = cfg.maxthreads;
 	}
 
-	CALLOC(threads, num_threads, sizeof *threads, goto finish);
+	CALLOC(threads, num_threads, sizeof(pthread_t), goto finish);
 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
