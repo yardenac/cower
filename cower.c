@@ -359,7 +359,7 @@ static const char *aur_cat[] = { NULL, "None", "daemons", "devel", "editors",
                                 "science", "system", "x11", "xfce", "kernels" };
 /* }}} */
 
-alpm_handle_t *alpm_init() /* {{{ */
+alpm_handle_t *alpm_init(void) /* {{{ */
 {
 	FILE *fp;
 	char line[PATH_MAX];
@@ -421,7 +421,7 @@ alpm_handle_t *alpm_init() /* {{{ */
 	return pmhandle;
 } /* }}} */
 
-alpm_list_t *alpm_find_foreign_pkgs() /* {{{ */
+alpm_list_t *alpm_find_foreign_pkgs(void) /* {{{ */
 {
 	const alpm_list_t *i;
 	alpm_list_t *ret = NULL;
@@ -705,7 +705,7 @@ alpm_list_t *filter_results(alpm_list_t *list) /* {{{ */
 	return alpm_list_msort(filterlist, alpm_list_count(filterlist), aurpkg_cmp);
 } /* }}} */
 
-int getcols() /* {{{ */
+int getcols(void) /* {{{ */
 {
 	int termwidth = -1;
 	const int default_tty = 80;
@@ -909,7 +909,7 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	return 1;
 } /* }}} */
 
-void openssl_crypto_cleanup() /* {{{ */
+void openssl_crypto_cleanup(void) /* {{{ */
 {
 	int i;
 
@@ -927,7 +927,7 @@ void openssl_crypto_cleanup() /* {{{ */
 	OPENSSL_free(openssl_lock.lock_count);
 } /* }}} */
 
-void openssl_crypto_init() /* {{{ */
+void openssl_crypto_init(void) /* {{{ */
 {
 	int i;
 
@@ -954,7 +954,7 @@ void openssl_thread_cb(int mode, int type, const char *file, int line) /* {{{ */
 	}
 } /* }}} */
 
-unsigned long openssl_thread_id() /* {{{ */
+unsigned long openssl_thread_id(void) /* {{{ */
 {
 	return pthread_self();
 } /* }}} */
@@ -1026,7 +1026,7 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 	return deplist;
 } /* }}} */
 
-int parse_configfile() /* {{{ */
+int parse_configfile(void) /* {{{ */
 {
 	char *xdg_config_home, *home, *config_path;
 	char line[PATH_MAX];
@@ -1735,7 +1735,7 @@ int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
 	return 0;
 } /* }}} */
 
-int set_working_dir() /* {{{ */
+int set_working_dir(void) /* {{{ */
 {
 	char *resolved;
 
@@ -1771,7 +1771,7 @@ int set_working_dir() /* {{{ */
 	return 0;
 } /* }}} */
 
-int strings_init() /* {{{ */
+int strings_init(void) /* {{{ */
 {
 	MALLOC(colstr, sizeof(struct strings_t), return 1);
 
@@ -2147,7 +2147,7 @@ static char *url_escape(char *in, int len, const char *delim) /* {{{ */
 	return strndup(buf, strlen(buf) - 1);
 } /* }}} */
 
-void usage() /* {{{ */
+void usage(void) /* {{{ */
 {
 	fprintf(stderr, "cower %s\n"
 	    "Usage: cower <operations> [options] target...\n\n", COWER_VERSION);
@@ -2181,7 +2181,7 @@ void usage() /* {{{ */
 	    "  -v, --verbose           output more\n\n");
 } /* }}} */
 
-void version() /* {{{ */
+void version(void) /* {{{ */
 {
 	printf("\n  " COWER_VERSION "\n");
 	printf("     \\\n"
