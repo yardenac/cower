@@ -291,7 +291,7 @@ static void print_results(alpm_list_t*, void (*)(struct aurpkg_t*));
 static int resolve_dependencies(CURL*, const char*);
 static int set_working_dir(void);
 static int strings_init(void);
-static char *strtrim(char*);
+static size_t strtrim(char*);
 static void *task_download(CURL*, void*);
 static void *task_query(CURL*, void*);
 static void *task_update(CURL*, void*);
@@ -379,16 +379,18 @@ alpm_handle_t *alpm_init(void) /* {{{ */
 	}
 
 	while(fgets(line, PATH_MAX, fp)) {
+		size_t linelen;
+
 		if((ptr = strchr(line, '#'))) {
 			*ptr = '\0';
 		}
-		if(*strtrim(line) == '\0') {
+		if(!(linelen = strtrim(line))) {
 			continue;
 		}
 
-		if(line[0] == '[' && line[strlen(line) - 1] == ']') {
+		if(line[0] == '[' && line[linelen - 1] == ']') {
 			free(section);
-			section = strndup(&line[1], strlen(line) - 2);
+			section = strndup(&line[1], linelen - 2);
 		}
 
 		if(strcmp(section, "options") != 0) {
@@ -1056,9 +1058,10 @@ int parse_configfile(void) /* {{{ */
 
 	while(fgets(line, PATH_MAX, fp)) {
 		char *key, *val;
+		size_t linelen;
 
-		strtrim(line);
-		if(strlen(line) == 0 || line[0] == '#') {
+		linelen = strtrim(line);
+		if(!linelen || line[0] == '#') {
 			continue;
 		}
 
@@ -1340,13 +1343,8 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) /* {{{ */
 		alpm_list_t **deplist;
 		size_t linelen;
 
-		strtrim(++lineptr);
-		if(*lineptr == '#') {
-			continue;
-		}
-
-		linelen = strlen(lineptr);
-		if(!linelen) {
+		linelen = strtrim(++lineptr);
+		if(!linelen || *lineptr == '#') {
 			continue;
 		}
 
@@ -1804,32 +1802,32 @@ int strings_init(void) /* {{{ */
 	return 0;
 } /* }}} */
 
-char *strtrim(char *str) /* {{{ */
+size_t strtrim(char *str) /* {{{ */
 {
-	char *pch = str;
+	char *left = str, *right;
 
 	if(!str || *str == '\0') {
-		return str;
+		return 0;
 	}
 
-	while(isspace((unsigned char)*pch)) {
-		pch++;
+	while(isspace((unsigned char)*left)) {
+		left++;
 	}
-	if(pch != str) {
-		memmove(str, pch, (strlen(pch) + 1));
+	if(left != str) {
+		memmove(str, left, (strlen(left) + 1));
 	}
 
 	if(*str == '\0') {
-		return str;
+		return 0;
 	}
 
-	pch = (str + (strlen(str) - 1));
-	while(isspace((unsigned char)*pch)) {
-		pch--;
+	right = (char*)rawmemchr(str, '\0') - 1;
+	while(isspace((unsigned char)*right)) {
+		right--;
 	}
-	*++pch = '\0';
+	*++right = '\0';
 
-	return str;
+	return right - left;
 } /* }}} */
 
 void *task_download(CURL *curl, void *arg) /* {{{ */
