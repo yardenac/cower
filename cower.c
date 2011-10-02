@@ -953,6 +953,7 @@ void openssl_thread_cb(int mode, int type, const char *file, int line) /* {{{ */
 		openssl_lock.lock_count[type]++;
 	} else {
 		pthread_mutex_unlock(&(openssl_lock.lock[type]));
+		openssl_lock.lock_count[type]--;
 	}
 } /* }}} */
 
