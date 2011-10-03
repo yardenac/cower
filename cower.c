@@ -56,6 +56,7 @@
 #define STREQ(x,y)            (strcmp((x),(y)) == 0)
 #define STR_STARTS_WITH(x,y)  (strncmp((x),(y), strlen(y)) == 0)
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
+#define KEY_IS(k)             (memcmp(p->key, (k), p->keysz) == 0)
 
 #ifndef PACMAN_ROOT
 	#define PACMAN_ROOT         "/"
@@ -271,6 +272,7 @@ static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static void indentprint(const char*, int);
 static int json_end_map(void*);
+static int json_integer(void *ctx, long long val);
 static int json_map_key(void*, const unsigned char*, size_t);
 static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
@@ -339,7 +341,7 @@ struct openssl_mutex_t openssl_lock;
 static yajl_callbacks callbacks = {
 	NULL,             /* null */
 	NULL,             /* boolean */
-	NULL,             /* integer */
+	json_integer,     /* integer */
 	NULL,             /* double */
 	NULL,             /* number */
 	json_string,      /* string */
@@ -841,6 +843,27 @@ int json_end_map(void *ctx) /* {{{ */
 	return 1;
 } /* }}} */
 
+int json_integer(void *ctx, long long val) /* {{{ */
+{
+	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
+
+	if(KEY_IS(AUR_ID)) {
+		p->aurpkg->id = (int)val;
+	} else if(KEY_IS(AUR_CAT)) {
+		p->aurpkg->cat = (int)val;
+	} else if(KEY_IS(AUR_VOTES)) {
+		p->aurpkg->votes = (int)val;
+	} else if(KEY_IS(AUR_OOD)) {
+		p->aurpkg->ood = (int)val;
+	} else if(KEY_IS(AUR_FIRSTSUB)) {
+		p->aurpkg->firstsub = (time_t)val;
+	} else if(KEY_IS(AUR_LASTMOD)) {
+		p->aurpkg->lastmod = (time_t)val;
+	}
+
+	return 1;
+} /* }}} */
+
 int json_map_key(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
 	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
@@ -870,7 +893,6 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	const char *val = (const char*)data;
 	char buffer[32];
 
-#define KEY_IS(k) (memcmp(p->key, (k), p->keysz) == 0)
 	if(KEY_IS(AUR_QUERY_TYPE) && STR_STARTS_WITH(val, AUR_QUERY_ERROR)) {
 		return 1;
 	}
