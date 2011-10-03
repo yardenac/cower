@@ -206,25 +206,24 @@ struct strings_t {
 };
 
 struct aurpkg_t {
-	int id;
-	const char *name;
-	const char *maint;
-	const char *ver;
-	const char *desc;
-	const char *url;
-	const char *lic;
-	int votes;
+	char *desc;
+	char *lic;
+	char *maint;
+	char *name;
+	char *url;
 	char *urlpath;
+	char *ver;
 	int cat;
+	int id;
 	int ood;
+	int votes;
 	time_t firstsub;
 	time_t lastmod;
-
+	alpm_list_t *conflicts;
 	alpm_list_t *depends;
 	alpm_list_t *makedepends;
 	alpm_list_t *optdepends;
 	alpm_list_t *provides;
-	alpm_list_t *conflicts;
 	alpm_list_t *replaces;
 };
 
