@@ -52,6 +52,7 @@
 #define MALLOC(p, s, action) do { p = calloc(1, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
 #define CALLOC(p, l, s, action) do { p = calloc(l, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
 #define FREE(x)               do { free((void*)x); x = NULL; } while(0)
+#define UNUSED                __attribute__((unused))
 #define STREQ(x,y)            (strcmp((x),(y)) == 0)
 #define STR_STARTS_WITH(x,y)  (strncmp((x),(y), strlen(y)) == 0)
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
@@ -944,10 +945,9 @@ void openssl_crypto_init(void) /* {{{ */
 	CRYPTO_set_locking_callback(openssl_thread_cb);
 } /* }}} */
 
-void openssl_thread_cb(int mode, int type, const char *file, int line) /* {{{ */
+void openssl_thread_cb(int mode, int type, const char UNUSED *file, /* {{{ */
+		int UNUSED line)
 {
-	(void)type; (void)file; (void)line;
-
 	if(mode & CRYPTO_LOCK) {
 		pthread_mutex_lock(&(openssl_lock.lock[type]));
 		openssl_lock.lock_count[type]++;
