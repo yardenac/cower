@@ -881,7 +881,7 @@ int json_start_map(void *ctx) /* {{{ */
 
 	p->json_depth++;
 	if(p->json_depth >= 1) {
-		p->aurpkg = calloc(1, sizeof(struct aurpkg_t));
+		CALLOC(p->aurpkg, 1, sizeof(struct aurpkg_t), return 0);
 	}
 
 	return 1;
