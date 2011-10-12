@@ -6,7 +6,7 @@ _cower() {
   _get_comp_words_by_ref cur prev
 
   # nullglob avoids problems when no results are found
-  [[ -o nullglob ]] || { shopt -s nullglob; ng=1; }
+  shopt -q nullglob || { shopt -s nullglob; ng=1; }
 
   opts="-d --download -i --info -m --msearch -s --search -u --update -c --color
         -f --force --format -h --help --ignore --ignorerepo --listdelim --nossl
