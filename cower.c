@@ -2129,10 +2129,14 @@ void *thread_pool(void *arg) /* {{{ */
 	}
 
 	while(1) {
+		job = NULL;
+
 		/* try to pop off the work queue */
 		pthread_mutex_lock(&lock);
-		job = workq->data;
-		workq = alpm_list_next(workq);
+		if(workq) {
+			job = workq->data;
+			workq = alpm_list_next(workq);
+		}
 		pthread_mutex_unlock(&lock);
 
 		/* make sure we hooked a new job */
@@ -2141,10 +2145,6 @@ void *thread_pool(void *arg) /* {{{ */
 		}
 
 		ret = alpm_list_join(ret, task->threadfn(curl, job));
-
-		if (!workq) {
-			break;
-		}
 	}
 
 	curl_easy_cleanup(curl);
