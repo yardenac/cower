@@ -2075,7 +2075,7 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 			colstr->pkg, (const char*)arg, colstr->nc);
 
 	qretval = task_query(curl, arg);
-	aurpkg = ((alpm_list_t*)qretval)->data;
+	aurpkg = qretval ? ((alpm_list_t*)qretval)->data : NULL;
 	if(aurpkg) {
 
 		pmpkg = alpm_db_get_pkg(db_local, arg);
@@ -2141,6 +2141,10 @@ void *thread_pool(void *arg) /* {{{ */
 		}
 
 		ret = alpm_list_join(ret, task->threadfn(curl, job));
+
+		if (!workq) {
+			break;
+		}
 	}
 
 	curl_easy_cleanup(curl);
