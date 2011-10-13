@@ -431,7 +431,7 @@ alpm_list_t *alpm_find_foreign_pkgs(void) /* {{{ */
 	alpm_list_t *ret = NULL;
 
 	for(i = alpm_db_get_pkgcache(db_local); i; i = alpm_list_next(i)) {
-		alpm_pkg_t *pkg = alpm_list_getdata(i);
+		alpm_pkg_t *pkg = i->data;
 
 		if(alpm_pkg_is_foreign(pkg)) {
 			ret = alpm_list_add(ret, strdup(alpm_pkg_get_name(pkg)));
@@ -449,7 +449,7 @@ int alpm_pkg_is_foreign(alpm_pkg_t *pkg) /* {{{ */
 	pkgname = alpm_pkg_get_name(pkg);
 
 	for(i = alpm_option_get_syncdbs(pmhandle); i; i = alpm_list_next(i)) {
-		if(alpm_db_get_pkg(alpm_list_getdata(i), pkgname)) {
+		if(alpm_db_get_pkg(i->data, pkgname)) {
 			return 0;
 		}
 	}
@@ -463,7 +463,7 @@ const char *alpm_provides_pkg(const char *pkgname) /* {{{ */
 	alpm_db_t *db;
 
 	for(i = alpm_option_get_syncdbs(pmhandle); i; i = alpm_list_next(i)) {
-		db = alpm_list_getdata(i);
+		db = i->data;
 		if(alpm_find_satisfier(alpm_db_get_pkgcache(db), pkgname)) {
 			return alpm_db_get_name(db);
 		}
@@ -682,12 +682,12 @@ alpm_list_t *filter_results(alpm_list_t *list) /* {{{ */
 
 	for(i = cfg.targets; i; i = alpm_list_next(i)) {
 		regex_t regex;
-		const char *targ = (const char*)alpm_list_getdata(i);
+		const char *targ = i->data;
 		filterlist = NULL;
 
 		if(regcomp(&regex, targ, REGEX_OPTS) == 0) {
 			for(j = list; j; j = alpm_list_next(j)) {
-				struct aurpkg_t *pkg = alpm_list_getdata(j);
+				struct aurpkg_t *pkg = j->data;
 				const char *name = pkg->name;
 				const char *desc = pkg->desc;
 
@@ -1469,11 +1469,11 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 
 	for(i = list; i; i = next) {
 		next = alpm_list_next(i);
-		if(wrap && cols > 0 && count + strlen(alpm_list_getdata(i)) >= cols) {
+		if(wrap && cols > 0 && count + strlen(i->data) >= cols) {
 			printf("%-*c", INFO_INDENT + 1, '\n');
 			count = INFO_INDENT;
 		}
-		count += printf("%s", (const char*)alpm_list_getdata(i));
+		count += printf("%s", (const char*)i->data);
 		if(next) {
 			count += print_escaped(delim);
 		}
@@ -1615,9 +1615,9 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 
 	if(pkg->optdepends) {
 		const alpm_list_t *i;
-		printf(PKG_OPTDEPENDS "  : %s\n", (const char*)alpm_list_getdata(pkg->optdepends));
+		printf(PKG_OPTDEPENDS "  : %s\n", (const char*)pkg->optdepends->data);
 		for(i = pkg->optdepends->next; i; i = alpm_list_next(i)) {
-			printf("%-*s%s\n", INFO_INDENT, "", (const char*)alpm_list_getdata(i));
+			printf("%-*s%s\n", INFO_INDENT, "", (const char*)i->data);
 		}
 	}
 
@@ -1685,7 +1685,7 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*)) /* {
 	}
 
 	for(i = results; i; i = alpm_list_next(i)) {
-		struct aurpkg_t *pkg = alpm_list_getdata(i);
+		struct aurpkg_t *pkg = i->data;
 
 		/* don't print duplicates */
 		if(!prev || aurpkg_cmp(pkg, prev) != 0) {
@@ -1722,7 +1722,7 @@ int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
 	free(filename);
 
 	for(i = deplist; i; i = alpm_list_next(i)) {
-		const char *depend = alpm_list_getdata(i);
+		const char *depend = i->data;
 		char *sanitized = strdup(depend);
 
 		sanitized[strcspn(sanitized, "<>=")] = '\0';
@@ -2032,7 +2032,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 		struct aurpkg_t *aurpkg;
 		char *pburl, *slash, *escaped, *pkgbuild;
 
-		aurpkg = alpm_list_getdata(pkglist);
+		aurpkg = pkglist->data;
 		escaped = url_escape(aurpkg->urlpath, 0, "/");
 		cwr_asprintf(&pburl, AUR_BASE_URL, cfg.proto, escaped);
 		slash = strrchr(pburl, '/');
@@ -2075,7 +2075,7 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 			colstr->pkg, (const char*)arg, colstr->nc);
 
 	qretval = task_query(curl, arg);
-	aurpkg = alpm_list_getdata(qretval);
+	aurpkg = ((alpm_list_t*)qretval)->data;
 	if(aurpkg) {
 
 		pmpkg = alpm_db_get_pkg(db_local, arg);
@@ -2131,7 +2131,7 @@ void *thread_pool(void *arg) /* {{{ */
 	while(1) {
 		/* try to pop off the work queue */
 		pthread_mutex_lock(&lock);
-		job = alpm_list_getdata(workq);
+		job = workq->data;
 		workq = alpm_list_next(workq);
 		pthread_mutex_unlock(&lock);
 
