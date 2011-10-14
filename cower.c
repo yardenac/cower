@@ -56,7 +56,7 @@
 #define STREQ(x,y)            (strcmp((x),(y)) == 0)
 #define STR_STARTS_WITH(x,y)  (strncmp((x),(y), strlen(y)) == 0)
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
-#define KEY_IS(k)             (memcmp(p->key, (k), p->keysz) == 0)
+#define KEY_IS(k)             (strncmp(p->key, (k), p->keysz) == 0)
 
 #ifndef PACMAN_ROOT
 	#define PACMAN_ROOT         "/"
