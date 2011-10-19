@@ -658,14 +658,20 @@ finish:
 
 size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream) /* {{{ */
 {
+	void *newdata;
 	size_t realsize = size * nmemb;
 	struct response_t *mem = (struct response_t*)stream;
 
-	mem->data = realloc(mem->data, mem->size + realsize + 1);
-	if(mem->data) {
+	newdata = realloc(mem->data, mem->size + realsize + 1);
+	if(newdata) {
+		mem->data = newdata;
 		memcpy(&(mem->data[mem->size]), ptr, realsize);
 		mem->size += realsize;
 		mem->data[mem->size] = '\0';
+	} else {
+		cwr_fprintf(stderr, LOG_ERROR, "failed to reallocate %zd bytes\n",
+				mem->size + realsize + 1);
+		return 0;
 	}
 
 	return realsize;
