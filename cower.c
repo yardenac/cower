@@ -82,6 +82,7 @@
 #define AUR_QUERY_TYPE_SEARCH "search"
 #define AUR_QUERY_TYPE_MSRCH  "msearch"
 #define AUR_QUERY_ERROR       "error"
+#define AUR_QUERY_RESULTCOUNT "resultcount"
 
 #define NAME                  "Name"
 #define VERSION               "Version"
@@ -230,6 +231,7 @@ struct aurpkg_t {
 
 struct yajl_parser_t {
 	alpm_list_t *pkglist;
+	int resultcount;
 	struct aurpkg_t *aurpkg;
 	char key[32];
 	size_t keysz;
@@ -865,6 +867,8 @@ int json_integer(void *ctx, long long val) /* {{{ */
 		p->aurpkg->firstsub = (time_t)val;
 	} else if(KEY_IS(AUR_LASTMOD)) {
 		p->aurpkg->lastmod = (time_t)val;
+	} else if(KEY_IS(AUR_QUERY_RESULTCOUNT)) {
+		p->resultcount = (int)val;
 	}
 
 	return 1;
