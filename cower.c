@@ -1995,9 +1995,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 		argstr = arg;
 	}
 
-	MALLOC(parse_struct, sizeof(struct yajl_parser_t), return NULL);
-	parse_struct->pkglist = NULL;
-	parse_struct->json_depth = 0;
+	CALLOC(parse_struct, 1, sizeof(struct yajl_parser_t), return NULL);
 	yajl_hand = yajl_alloc(&callbacks, NULL, (void*)parse_struct);
 
 	curl = curl_init_easy_handle(curl);
