@@ -399,8 +399,7 @@ alpm_handle_t *alpm_init(void) /* {{{ */
 
 		if(strcmp(section, "options") != 0) {
 			if(!cfg.skiprepos && !alpm_list_find_str(cfg.ignore.repos, section)) {
-				alpm_db_register_sync(pmhandle, section,
-						ALPM_SIG_DATABASE | ALPM_SIG_DATABASE_OPTIONAL);
+				alpm_db_register_sync(pmhandle, section, 0);
 				cwr_printf(LOG_DEBUG, "registering alpm db: %s\n", section);
 			}
 		} else {
