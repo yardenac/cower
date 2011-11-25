@@ -1864,6 +1864,7 @@ size_t strtrim(char *str) /* {{{ */
 void *task_download(CURL *curl, void *arg) /* {{{ */
 {
 	alpm_list_t *queryresult = NULL;
+	struct aurpkg_t *result;
 	CURLcode curlstat;
 	const char *db;
 	char *url, *escaped;
@@ -1907,7 +1908,8 @@ void *task_download(CURL *curl, void *arg) /* {{{ */
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 
-	escaped = url_escape(((struct aurpkg_t*)(queryresult->data))->urlpath, 0, "/");
+	result = queryresult->data;
+	escaped = url_escape(result->urlpath, 0, "/");
 	cwr_asprintf(&url, AUR_BASE_URL, cfg.proto, escaped);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	free(escaped);
@@ -1931,10 +1933,9 @@ void *task_download(CURL *curl, void *arg) /* {{{ */
 					(const char*)arg, httpcode);
 			goto finish;
 	}
-	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", (const char*)arg);
+	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result->name);
 	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
-			colstr->pkg, (const char*)((struct aurpkg_t*)(queryresult->data))->name,
-			colstr->nc, cfg.dlpath);
+			colstr->pkg, result->name, colstr->nc, cfg.dlpath);
 
 	ret = archive_extract_file(&response);
 	if(ret != ARCHIVE_EOF && ret != ARCHIVE_OK) {
