@@ -1933,7 +1933,8 @@ void *task_download(CURL *curl, void *arg) /* {{{ */
 	}
 	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", (const char*)arg);
 	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
-			colstr->pkg, (const char*)arg, colstr->nc, cfg.dlpath);
+			colstr->pkg, (const char*)((struct aurpkg_t*)(queryresult->data))->name,
+			colstr->nc, cfg.dlpath);
 
 	ret = archive_extract_file(&response);
 	if(ret != ARCHIVE_EOF && ret != ARCHIVE_OK) {
