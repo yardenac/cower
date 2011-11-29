@@ -906,26 +906,32 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 		return 1;
 	}
 
+
+#define VALDUPE(dest, src, n) \
+	dest = malloc(n + 1); \
+	memcpy(dest, src, n); \
+	dest[n] = '\0';
+
 	if(KEY_IS(AUR_ID)) {
 		snprintf(buffer, size + 1, "%s", val);
 		p->aurpkg->id = strtol(buffer, NULL, 10);
 	} else if(KEY_IS(NAME)) {
-		p->aurpkg->name = strndup(val, size);
+		VALDUPE(p->aurpkg->name, val, size);
 	} else if(KEY_IS(PKG_MAINT)) {
-		p->aurpkg->maint = strndup(val, size);
+		VALDUPE(p->aurpkg->maint, val, size);
 	} else if(KEY_IS(VERSION)) {
-		p->aurpkg->ver = strndup(val, size);
+		VALDUPE(p->aurpkg->ver, val, size);
 	} else if(KEY_IS(AUR_CAT)) {
 		snprintf(buffer, size + 1, "%s", val);
 		p->aurpkg->cat = strtol(buffer, NULL, 10);
 	} else if(KEY_IS(AUR_DESC)) {
-		p->aurpkg->desc = strndup(val, size);
+		VALDUPE(p->aurpkg->desc, val, size);
 	} else if(KEY_IS(URL)) {
-		p->aurpkg->url = strndup(val, size);
+		VALDUPE(p->aurpkg->url, val, size);
 	} else if(KEY_IS(URLPATH)) {
-		p->aurpkg->urlpath = strndup(val, size);
+		VALDUPE(p->aurpkg->urlpath, val, size);
 	} else if(KEY_IS(AUR_LICENSE)) {
-		p->aurpkg->lic = strndup(val, size);
+		VALDUPE(p->aurpkg->lic, val, size);
 	} else if(KEY_IS(AUR_VOTES)) {
 		snprintf(buffer, size + 1, "%s", val);
 		p->aurpkg->votes = strtol(buffer, NULL, 10);
