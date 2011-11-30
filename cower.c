@@ -1474,7 +1474,7 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 		return;
 	}
 
-	cols = getcols();
+	cols = wrap ? getcols() : 0;
 
 	if(fieldname) {
 		count += printf("%-*s: ", INFO_INDENT - 2, fieldname);
