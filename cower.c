@@ -906,15 +906,17 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 		return 1;
 	}
 
-
 #define VALDUPE(dest, src, n) \
 	dest = malloc(n + 1); \
 	memcpy(dest, src, n); \
 	dest[n] = '\0';
 
+#define NUMCOPY(dest, src, n) \
+	snprintf(buffer, n + 1, "%s", src); \
+	dest = strtol(buffer, NULL, 10);
+
 	if(KEY_IS(AUR_ID)) {
-		snprintf(buffer, size + 1, "%s", val);
-		p->aurpkg->id = strtol(buffer, NULL, 10);
+		NUMCOPY(p->aurpkg->id, val, size);
 	} else if(KEY_IS(NAME)) {
 		VALDUPE(p->aurpkg->name, val, size);
 	} else if(KEY_IS(PKG_MAINT)) {
@@ -922,8 +924,7 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	} else if(KEY_IS(VERSION)) {
 		VALDUPE(p->aurpkg->ver, val, size);
 	} else if(KEY_IS(AUR_CAT)) {
-		snprintf(buffer, size + 1, "%s", val);
-		p->aurpkg->cat = strtol(buffer, NULL, 10);
+		NUMCOPY(p->aurpkg->cat, val, size);
 	} else if(KEY_IS(AUR_DESC)) {
 		VALDUPE(p->aurpkg->desc, val, size);
 	} else if(KEY_IS(URL)) {
@@ -933,16 +934,13 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	} else if(KEY_IS(AUR_LICENSE)) {
 		VALDUPE(p->aurpkg->lic, val, size);
 	} else if(KEY_IS(AUR_VOTES)) {
-		snprintf(buffer, size + 1, "%s", val);
-		p->aurpkg->votes = strtol(buffer, NULL, 10);
+		NUMCOPY(p->aurpkg->votes, val, size);
 	} else if(KEY_IS(AUR_OOD)) {
-		p->aurpkg->ood = strncmp(val, "1", 1) == 0 ? 1 : 0;
+		p->aurpkg->ood = *val - 48;
 	} else if(KEY_IS(AUR_FIRSTSUB)) {
-		snprintf(buffer, size + 1, "%s", val);
-		p->aurpkg->firstsub = strtol(buffer, NULL, 10);
+		NUMCOPY(p->aurpkg->firstsub, val, size);
 	} else if(KEY_IS(AUR_LASTMOD)) {
-		snprintf(buffer, size + 1, "%s", val);
-		p->aurpkg->lastmod = strtol(buffer, NULL, 10);
+		NUMCOPY(p->aurpkg->lastmod, val, size);
 	}
 
 	return 1;
