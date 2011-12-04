@@ -1875,7 +1875,6 @@ void *task_download(CURL *curl, void *arg) /* {{{ */
 	int ret;
 	long httpcode;
 	struct response_t response = { 0, 0 };
-	struct stat st;
 	static pthread_mutex_t alpmlock = PTHREAD_MUTEX_INITIALIZER;
 
 	curl = curl_init_easy_handle(curl);
@@ -1899,7 +1898,7 @@ void *task_download(CURL *curl, void *arg) /* {{{ */
 		return NULL;
 	}
 
-	if(stat(arg, &st) == 0 && !cfg.force) {
+	if(access(arg, F_OK) == 0 && !cfg.force) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
 		cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
 				cfg.dlpath, (const char*)arg);
