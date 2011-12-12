@@ -339,6 +339,7 @@ alpm_handle_t *pmhandle;
 alpm_db_t *db_local;
 alpm_list_t *workq;
 struct openssl_mutex_t openssl_lock;
+static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
 
 static yajl_callbacks callbacks = {
 	NULL,             /* null */
@@ -461,16 +462,20 @@ int alpm_pkg_is_foreign(alpm_pkg_t *pkg) /* {{{ */
 const char *alpm_provides_pkg(const char *pkgname) /* {{{ */
 {
 	const alpm_list_t *i;
-	alpm_db_t *db;
+	const char *dbname = NULL;
+	static pthread_mutex_t alpmlock = PTHREAD_MUTEX_INITIALIZER;
 
+	pthread_mutex_lock(&alpmlock);
 	for(i = alpm_option_get_syncdbs(pmhandle); i; i = alpm_list_next(i)) {
-		db = i->data;
+		alpm_db_t *db = i->data;
 		if(alpm_find_satisfier(alpm_db_get_pkgcache(db), pkgname)) {
-			return alpm_db_get_name(db);
+			dbname = alpm_db_get_name(db);
+			break;
 		}
 	}
+	pthread_mutex_unlock(&alpmlock);
 
-	return NULL;
+	return dbname;
 } /* }}} */
 
 int archive_extract_file(const struct response_t *file) /* {{{ */
@@ -1713,7 +1718,6 @@ int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
 	const alpm_list_t *i;
 	alpm_list_t *deplist = NULL;
 	char *filename, *pkgbuild;
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 	void *retval;
 
 	curl = curl_init_easy_handle(curl);
@@ -1741,9 +1745,9 @@ int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
 		sanitized[strcspn(sanitized, "<>=")] = '\0';
 
 		if(!alpm_list_find_str(cfg.targets, sanitized)) {
-			pthread_mutex_lock(&lock);
+			pthread_mutex_lock(&listlock);
 			cfg.targets = alpm_list_add(cfg.targets, sanitized);
-			pthread_mutex_unlock(&lock);
+			pthread_mutex_unlock(&listlock);
 		} else {
 			if(cfg.logmask & LOG_BRIEF &&
 							!alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
@@ -1875,14 +1879,10 @@ void *task_download(CURL *curl, void *arg) /* {{{ */
 	int ret;
 	long httpcode;
 	struct response_t response = { 0, 0 };
-	static pthread_mutex_t alpmlock = PTHREAD_MUTEX_INITIALIZER;
 
 	curl = curl_init_easy_handle(curl);
 
-	pthread_mutex_lock(&alpmlock);
 	db = alpm_provides_pkg(arg);
-	pthread_mutex_unlock(&alpmlock);
-
 	if(db) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", (const char*)arg);
 		cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s\n",
@@ -2131,7 +2131,6 @@ void *thread_pool(void *arg) /* {{{ */
 	CURL *curl;
 	void *job;
 	struct task_t *task;
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 	task = (struct task_t*)arg;
 	curl = curl_easy_init();
@@ -2144,12 +2143,12 @@ void *thread_pool(void *arg) /* {{{ */
 		job = NULL;
 
 		/* try to pop off the work queue */
-		pthread_mutex_lock(&lock);
+		pthread_mutex_lock(&listlock);
 		if(workq) {
 			job = workq->data;
 			workq = alpm_list_next(workq);
 		}
-		pthread_mutex_unlock(&lock);
+		pthread_mutex_unlock(&listlock);
 
 		/* make sure we hooked a new job */
 		if(!job) {
