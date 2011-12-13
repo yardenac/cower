@@ -269,6 +269,7 @@ static int cwr_asprintf(char**, const char*, ...) __attribute__((format(printf,2
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
+static void *download(CURL *curl, void *arg);
 static alpm_list_t *filter_results(alpm_list_t*);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
@@ -285,6 +286,7 @@ static void openssl_thread_cb(int, int, const char*, int);
 static alpm_list_t *parse_bash_array(alpm_list_t*, char*, pkgdetail_t);
 static int parse_configfile(void);
 static int parse_options(int, char*[]);
+static int pkg_is_binary(const char *pkg);
 static void pkgbuild_get_extinfo(char*, alpm_list_t**[]);
 static int print_escaped(const char*);
 static void print_extinfo_list(alpm_list_t*, const char*, const char*, int);
@@ -681,6 +683,86 @@ size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream) /
 	}
 
 	return realsize;
+} /* }}} */
+
+void *download(CURL *curl, void *arg) /* {{{ */
+{
+	alpm_list_t *queryresult = NULL;
+	struct aurpkg_t *result;
+	CURLcode curlstat;
+	char *url, *escaped;
+	int ret;
+	long httpcode;
+	struct response_t response = { 0, 0 };
+
+	curl = curl_init_easy_handle(curl);
+
+	queryresult = task_query(curl, arg);
+	if(!queryresult) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", (const char*)arg);
+		return NULL;
+	}
+
+	if(access(arg, F_OK) == 0 && !cfg.force) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
+				cfg.dlpath, (const char*)arg);
+		alpm_list_free_inner(queryresult, aurpkg_free);
+		alpm_list_free(queryresult);
+		return NULL;
+	}
+
+	curl_easy_setopt(curl, CURLOPT_ENCODING, "identity"); /* disable compression */
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
+
+	result = queryresult->data;
+	escaped = url_escape(result->urlpath, 0, "/");
+	cwr_asprintf(&url, AUR_BASE_URL, cfg.proto, escaped);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	free(escaped);
+
+	curlstat = curl_easy_perform(curl);
+
+	if(curlstat != CURLE_OK) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", (const char*)arg, curl_easy_strerror(curlstat));
+		goto finish;
+	}
+
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
+
+	switch(httpcode) {
+		case 200:
+			break;
+		default:
+			cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+			cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with http%ld\n",
+					(const char*)arg, httpcode);
+			goto finish;
+	}
+	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result->name);
+	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
+			colstr->pkg, result->name, colstr->nc, cfg.dlpath);
+
+	ret = archive_extract_file(&response);
+	if(ret != ARCHIVE_EOF && ret != ARCHIVE_OK) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball\n",
+				(const char*)arg);
+		goto finish;
+	}
+
+	if(cfg.getdeps) {
+		resolve_dependencies(curl, arg);
+	}
+
+finish:
+	FREE(url);
+	FREE(response.data);
+
+	return queryresult;
 } /* }}} */
 
 alpm_list_t *filter_results(alpm_list_t *list) /* {{{ */
@@ -1373,6 +1455,21 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 	return 0;
 } /* }}} */
 
+int pkg_is_binary(const char *pkg) /* {{{ */
+{
+	const char *db = alpm_provides_pkg(pkg);
+
+	if(db) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", pkg);
+		cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s\n",
+				colstr->pkg, pkg, colstr->nc,
+				colstr->repo, db, colstr->nc);
+		return 1;
+	}
+
+	return 0;
+} /* }}} */
+
 void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) /* {{{ */
 {
 	char *lineptr;
@@ -1760,9 +1857,11 @@ int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
 			if(alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
 				cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
 			} else {
-				retval = task_download(curl, sanitized);
-				alpm_list_free_inner(retval, aurpkg_free);
-				alpm_list_free(retval);
+				if(!pkg_is_binary(depend)) {
+					retval = task_download(curl, sanitized);
+					alpm_list_free_inner(retval, aurpkg_free);
+					alpm_list_free(retval);
+				}
 			}
 		}
 	}
@@ -1871,92 +1970,11 @@ size_t strtrim(char *str) /* {{{ */
 
 void *task_download(CURL *curl, void *arg) /* {{{ */
 {
-	alpm_list_t *queryresult = NULL;
-	struct aurpkg_t *result;
-	CURLcode curlstat;
-	const char *db;
-	char *url, *escaped;
-	int ret;
-	long httpcode;
-	struct response_t response = { 0, 0 };
-
-	curl = curl_init_easy_handle(curl);
-
-	db = alpm_provides_pkg(arg);
-	if(db) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s\n",
-				colstr->pkg, (const char*)arg, colstr->nc,
-				colstr->repo, db, colstr->nc);
+	if(pkg_is_binary(arg)) {
 		return NULL;
+	} else {
+		return download(curl, arg);
 	}
-
-	queryresult = task_query(curl, arg);
-	if(!queryresult) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", (const char*)arg);
-		return NULL;
-	}
-
-	if(access(arg, F_OK) == 0 && !cfg.force) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
-				cfg.dlpath, (const char*)arg);
-		alpm_list_free_inner(queryresult, aurpkg_free);
-		alpm_list_free(queryresult);
-		return NULL;
-	}
-
-	curl_easy_setopt(curl, CURLOPT_ENCODING, "identity"); /* disable compression */
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
-
-	result = queryresult->data;
-	escaped = url_escape(result->urlpath, 0, "/");
-	cwr_asprintf(&url, AUR_BASE_URL, cfg.proto, escaped);
-	curl_easy_setopt(curl, CURLOPT_URL, url);
-	free(escaped);
-
-	curlstat = curl_easy_perform(curl);
-
-	if(curlstat != CURLE_OK) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", (const char*)arg, curl_easy_strerror(curlstat));
-		goto finish;
-	}
-
-	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
-
-	switch(httpcode) {
-		case 200:
-			break;
-		default:
-			cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-			cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with http%ld\n",
-					(const char*)arg, httpcode);
-			goto finish;
-	}
-	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result->name);
-	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
-			colstr->pkg, result->name, colstr->nc, cfg.dlpath);
-
-	ret = archive_extract_file(&response);
-	if(ret != ARCHIVE_EOF && ret != ARCHIVE_OK) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball\n",
-				(const char*)arg);
-		goto finish;
-	}
-
-	if(cfg.getdeps) {
-		resolve_dependencies(curl, arg);
-	}
-
-finish:
-	FREE(url);
-	FREE(response.data);
-
-	return queryresult;
 } /* }}} */
 
 void *task_query(CURL *curl, void *arg) /* {{{ */
