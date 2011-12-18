@@ -987,10 +987,10 @@ int json_start_map(void *ctx) /* {{{ */
 int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
 	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
-	const char *val = (const char*)data;
 	char buffer[32];
 
-	if(KEY_IS(AUR_QUERY_TYPE) && STR_STARTS_WITH(val, AUR_QUERY_ERROR)) {
+	if(KEY_IS(AUR_QUERY_TYPE) &&
+			STR_STARTS_WITH((const char*)data, AUR_QUERY_ERROR)) {
 		return 1;
 	}
 
@@ -1004,31 +1004,31 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	dest = strtol(buffer, NULL, 10);
 
 	if(KEY_IS(AUR_ID)) {
-		NUMCOPY(p->aurpkg->id, val, size);
+		NUMCOPY(p->aurpkg->id, data, size);
 	} else if(KEY_IS(NAME)) {
-		VALDUPE(p->aurpkg->name, val, size);
+		VALDUPE(p->aurpkg->name, data, size);
 	} else if(KEY_IS(PKG_MAINT)) {
-		VALDUPE(p->aurpkg->maint, val, size);
+		VALDUPE(p->aurpkg->maint, data, size);
 	} else if(KEY_IS(VERSION)) {
-		VALDUPE(p->aurpkg->ver, val, size);
+		VALDUPE(p->aurpkg->ver, data, size);
 	} else if(KEY_IS(AUR_CAT)) {
-		NUMCOPY(p->aurpkg->cat, val, size);
+		NUMCOPY(p->aurpkg->cat, data, size);
 	} else if(KEY_IS(AUR_DESC)) {
-		VALDUPE(p->aurpkg->desc, val, size);
+		VALDUPE(p->aurpkg->desc, data, size);
 	} else if(KEY_IS(URL)) {
-		VALDUPE(p->aurpkg->url, val, size);
+		VALDUPE(p->aurpkg->url, data, size);
 	} else if(KEY_IS(URLPATH)) {
-		VALDUPE(p->aurpkg->urlpath, val, size);
+		VALDUPE(p->aurpkg->urlpath, data, size);
 	} else if(KEY_IS(AUR_LICENSE)) {
-		VALDUPE(p->aurpkg->lic, val, size);
+		VALDUPE(p->aurpkg->lic, data, size);
 	} else if(KEY_IS(AUR_VOTES)) {
-		NUMCOPY(p->aurpkg->votes, val, size);
+		NUMCOPY(p->aurpkg->votes, data, size);
 	} else if(KEY_IS(AUR_OOD)) {
-		p->aurpkg->ood = *val - 48;
+		p->aurpkg->ood = *data - 48;
 	} else if(KEY_IS(AUR_FIRSTSUB)) {
-		NUMCOPY(p->aurpkg->firstsub, val, size);
+		NUMCOPY(p->aurpkg->firstsub, data, size);
 	} else if(KEY_IS(AUR_LASTMOD)) {
-		NUMCOPY(p->aurpkg->lastmod, val, size);
+		NUMCOPY(p->aurpkg->lastmod, data, size);
 	}
 
 	return 1;
