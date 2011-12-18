@@ -531,6 +531,7 @@ void aurpkg_free(void *pkg) /* {{{ */
 	FREE(it->ver);
 	FREE(it->desc);
 	FREE(it->url);
+	FREE(it->urlpath);
 	FREE(it->lic);
 
 	FREELIST(it->depends);
@@ -976,7 +977,7 @@ int json_start_map(void *ctx) /* {{{ */
 	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
 
 	p->json_depth++;
-	if(p->json_depth >= 1) {
+	if(p->json_depth > 1) {
 		CALLOC(p->aurpkg, 1, sizeof(struct aurpkg_t), return 0);
 	}
 
