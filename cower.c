@@ -1633,7 +1633,7 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 					printf(fmt, pkg->lic);
 					break;
 				case 'm':
-					printf(fmt, pkg->maint);
+					printf(fmt, pkg->maint ? pkg->maint : "(orphan)");
 					break;
 				case 'n':
 					printf(fmt, pkg->name);
@@ -1747,7 +1747,7 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 				 pkg->ood ? colstr->ood : colstr->utd,
 				 pkg->ood ? "Yes" : "No", colstr->nc);
 
-	printf(PKG_MAINT "     : %s\n", pkg->maint);
+	printf(PKG_MAINT "     : %s\n", pkg->maint ? pkg->maint : "(orphan)");
 
 	ts = localtime(&pkg->firstsub);
 	strftime(datestring, 42, PKG_TIMEFMT, ts);
