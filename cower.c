@@ -1128,8 +1128,6 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 	}
 
 	for(token = strtok(array, " \t\n"); token; token = strtok(NULL, " \t\n")) {
-		static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-
 		/* found an embedded comment. skip to the next line */
 		if(*token == '#') {
 			strtok(NULL, "\n");
@@ -1151,12 +1149,9 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 		}
 
 		cwr_printf(LOG_DEBUG, "adding depend: %s\n", token);
-
-		pthread_mutex_lock(&lock);
 		if(!alpm_list_find_str(deplist, token)) {
 			deplist = alpm_list_add(deplist, strdup(token));
 		}
-		pthread_mutex_unlock(&lock);
 	}
 
 	return deplist;
