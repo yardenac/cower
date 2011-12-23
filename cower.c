@@ -261,6 +261,7 @@ static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*);
 static int aurpkg_cmp(const void*, const void*);
+static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg);
 static void aurpkg_free(void*);
 static CURL *curl_init_easy_handle(CURL*);
 static char *curl_get_url_as_buffer(CURL*, const char*);
@@ -514,6 +515,16 @@ int aurpkg_cmp(const void *p1, const void *p2) /* {{{ */
 	struct aurpkg_t *pkg2 = (struct aurpkg_t*)p2;
 
 	return strcmp((const char*)pkg1->name, (const char*)pkg2->name);
+} /* }}} */
+
+struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
+{
+	struct aurpkg_t *newpkg;
+
+	MALLOC(newpkg, sizeof(struct aurpkg_t), return NULL);
+	memcpy(newpkg, pkg, sizeof(struct aurpkg_t));
+
+	return newpkg;
 } /* }}} */
 
 void aurpkg_free(void *pkg) /* {{{ */
@@ -932,7 +943,7 @@ int json_end_map(void *ctx) /* {{{ */
 
 	p->json_depth--;
 	if(p->json_depth > 0) {
-		p->pkglist = alpm_list_add_sorted(p->pkglist, p->aurpkg, aurpkg_cmp);
+		p->pkglist = alpm_list_add_sorted(p->pkglist, aurpkg_dup(p->aurpkg), aurpkg_cmp);
 	}
 
 	return 1;
@@ -978,7 +989,7 @@ int json_start_map(void *ctx) /* {{{ */
 
 	p->json_depth++;
 	if(p->json_depth > 1) {
-		CALLOC(p->aurpkg, 1, sizeof(struct aurpkg_t), return 0);
+		memset(p->aurpkg, 0, sizeof(struct aurpkg_t));
 	}
 
 	return 1;
@@ -2023,6 +2034,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 	}
 
 	CALLOC(parse_struct, 1, sizeof(struct yajl_parser_t), return NULL);
+	CALLOC(parse_struct->aurpkg, 1, sizeof(struct aurpkg_t), return NULL);
 	yajl_hand = yajl_alloc(&callbacks, NULL, (void*)parse_struct);
 
 	curl = curl_init_easy_handle(curl);
@@ -2086,6 +2098,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 finish:
 	yajl_free(yajl_hand);
 	curl_free(escaped);
+	FREE(parse_struct->aurpkg);
 	FREE(parse_struct);
 	FREE(url);
 
