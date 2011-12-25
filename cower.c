@@ -2105,9 +2105,10 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 	alpm_pkg_t *pmpkg;
 	struct aurpkg_t *aurpkg;
 	void *dlretval, *qretval;
+	const char *candidate = arg;
 
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
-			colstr->pkg, (const char*)arg, colstr->nc);
+			colstr->pkg, candidate, colstr->nc);
 
 	qretval = task_query(curl, arg);
 	aurpkg = qretval ? ((alpm_list_t*)qretval)->data : NULL;
@@ -2117,7 +2118,7 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 
 		if(!pmpkg) {
 			cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n",
-					(const char*)arg);
+					candidate);
 			goto finish;
 		}
 
@@ -2125,7 +2126,7 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 			if(alpm_list_find_str(cfg.ignore.pkgs, arg)) {
 				if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
 					cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
-							colstr->pkg, (const char*)arg, colstr->nc,
+							colstr->pkg, candidate, colstr->nc,
 							colstr->ood, alpm_pkg_get_version(pmpkg), colstr->nc,
 							colstr->utd, aurpkg->ver, colstr->nc);
 				}
@@ -2139,10 +2140,10 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 				alpm_list_free(dlretval);
 			} else {
 				if(cfg.quiet) {
-					printf("%s%s%s\n", colstr->pkg, (const char*)arg, colstr->nc);
+					printf("%s%s%s\n", colstr->pkg, candidate, colstr->nc);
 				} else {
 					cwr_printf(LOG_INFO, "%s%s %s%s%s -> %s%s%s\n",
-							colstr->pkg, (const char*)arg,
+							colstr->pkg, candidate,
 							colstr->ood, alpm_pkg_get_version(pmpkg), colstr->nc,
 							colstr->utd, aurpkg->ver, colstr->nc);
 				}
