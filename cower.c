@@ -2106,10 +2106,6 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 	struct aurpkg_t *aurpkg;
 	void *dlretval, *qretval;
 
-	if(alpm_list_find_str(cfg.ignore.pkgs, arg)) {
-		return NULL;
-	}
-
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
 			colstr->pkg, (const char*)arg, colstr->nc);
 
@@ -2126,6 +2122,16 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 		}
 
 		if(alpm_pkg_vercmp(aurpkg->ver, alpm_pkg_get_version(pmpkg)) > 0) {
+			if(alpm_list_find_str(cfg.ignore.pkgs, arg)) {
+				if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
+					cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
+							colstr->pkg, (const char*)arg, colstr->nc,
+							colstr->ood, alpm_pkg_get_version(pmpkg), colstr->nc,
+							colstr->utd, aurpkg->ver, colstr->nc);
+				}
+				return NULL;
+			}
+
 			if(cfg.opmask & OP_DOWNLOAD) {
 				/* we don't care about the return, but we do care about leaks */
 				dlretval = task_download(curl, (void*)aurpkg->name);
