@@ -1011,7 +1011,8 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	dest[n] = '\0';
 
 #define NUMCOPY(dest, src, n) \
-	snprintf(buffer, n + 1, "%s", src); \
+	memcpy(buffer, src, n); \
+	buffer[n] = '\0'; \
 	dest = strtol(buffer, NULL, 10);
 
 	if(KEY_IS(AUR_ID)) {
