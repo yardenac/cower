@@ -1538,36 +1538,36 @@ int print_escaped(const char *delim) /* {{{ */
 		if(*f == '\\') {
 			switch(*++f) {
 				case '\\':
-					putchar('\\');
+					fputc('\\', stdout);
 					break;
 				case '"':
-					putchar('\"');
+					fputc('\"', stdout);
 					break;
 				case 'a':
-					putchar('\a');
+					fputc('\a', stdout);
 					break;
 				case 'b':
-					putchar('\b');
+					fputc('\b', stdout);
 					break;
 				case 'e': /* \e is nonstandard */
-					putchar('\033');
+					fputc('\033', stdout);
 					break;
 				case 'n':
-					putchar('\n');
+					fputc('\n', stdout);
 					break;
 				case 'r':
-					putchar('\r');
+					fputc('\r', stdout);
 					break;
 				case 't':
-					putchar('\t');
+					fputc('\t', stdout);
 					break;
 				case 'v':
-					putchar('\v');
+					fputc('\v', stdout);
 					break;
 				++out;
 			}
 		} else {
-			putchar(*f);
+			fputc(*f, stdout);
 			++out;
 		}
 	}
@@ -1601,7 +1601,7 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 			count += print_escaped(delim);
 		}
 	}
-	putchar('\n');
+	fputc('\n', stdout);
 } /* }}} */
 
 void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
@@ -1686,10 +1686,10 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 					print_extinfo_list(pkg->replaces, NULL, cfg.delim, 0);
 					break;
 				case '%':
-					putchar('%');
+					fputc('%', stdout);
 					break;
 				default:
-					putchar('?');
+					fputc('?', stdout);
 					break;
 			}
 		} else if(*p == '\\') {
@@ -1699,7 +1699,7 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 			ebuf[2] = '\0';
 			print_escaped(ebuf);
 		} else {
-			putchar(*p);
+			fputc(*p, stdout);
 		}
 	}
 
@@ -1723,7 +1723,7 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 		}
 		printf(" %s[%sinstalled%s]%s", colstr->url, instcolor, colstr->url, colstr->nc);
 	}
-	putchar('\n');
+	fputc('\n', stdout);
 
 	printf(VERSION "        : %s%s%s\n",
 			pkg->ood ? colstr->ood : colstr->utd, pkg->ver, colstr->nc);
@@ -1789,7 +1789,7 @@ void print_pkg_search(struct aurpkg_t *pkg) /* {{{ */
 		}
 		printf("\n    ");
 		indentprint(pkg->desc, SRCH_INDENT);
-		putchar('\n');
+		fputc('\n', stdout);
 	}
 } /* }}} */
 
