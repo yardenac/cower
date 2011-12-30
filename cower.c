@@ -2069,14 +2069,12 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 
 	if(pkglist && cfg.extinfo) {
 		struct aurpkg_t *aurpkg;
-		char *pburl, *slash, *escaped, *pkgbuild;
+		char *pburl, *escaped, *pkgbuild;
 
 		aurpkg = pkglist->data;
 		escaped = url_escape(aurpkg->urlpath, 0, "/");
 		cwr_asprintf(&pburl, AUR_BASE_URL, cfg.proto, escaped);
-		slash = strrchr(pburl, '/');
-		memcpy(slash + 1, "PKGBUILD", 8);
-		slash[9] = '\0';
+		memcpy(strrchr(pburl, '/') + 1, "PKGBUILD\0", 9);
 
 		pkgbuild = curl_get_url_as_buffer(curl, pburl);
 		free(escaped);
