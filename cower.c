@@ -1137,9 +1137,9 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 
 		/* unquote the element */
 		if(*token == '\'' || *token == '\"') {
-			token++;
-			ptr = strrchr(token, *(token - 1));
+			ptr = strrchr(token + 1, *token);
 			if(ptr) {
+				token++;
 				*ptr = '\0';
 			}
 		}
