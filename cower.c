@@ -1293,7 +1293,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 {
 	int opt, option_index = 0;
 
-	static struct option opts[] = {
+	static const struct option opts[] = {
 		/* operations */
 		{"download",    no_argument,        0, 'd'},
 		{"info",        no_argument,        0, 'i'},
@@ -1424,7 +1424,6 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 					return 1;
 				}
 				break;
-
 			case OP_TIMEOUT:
 				cfg.timeout = strtol(optarg, &token, 10);
 				if(*token != '\0') {
@@ -1432,9 +1431,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 					return 1;
 				}
 				break;
-
 			case '?':
-				return 1;
 			default:
 				return 1;
 		}
