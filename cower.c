@@ -1098,7 +1098,7 @@ unsigned long openssl_thread_id(void) /* {{{ */
 
 alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t type) /* {{{ */
 {
-	char *ptr, *token;
+	char *ptr, *token, *saveptr;
 
 	if(!array) {
 		return NULL;
@@ -1128,10 +1128,11 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 		return deplist;
 	}
 
-	for(token = strtok(array, " \t\n"); token; token = strtok(NULL, " \t\n")) {
+	for(token = strtok_r(array, " \t\n", &saveptr); token;
+			token = strtok_r(NULL, " \t\n", &saveptr)) {
 		/* found an embedded comment. skip to the next line */
 		if(*token == '#') {
-			strtok(NULL, "\n");
+			strtok_r(NULL, "\n", &saveptr);
 			continue;
 		}
 
