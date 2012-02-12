@@ -639,6 +639,7 @@ CURL *curl_init_easy_handle(CURL *handle) /* {{{ */
 	curl_easy_setopt(handle, CURLOPT_USERAGENT, COWER_USERAGENT);
 	curl_easy_setopt(handle, CURLOPT_ENCODING, "deflate, gzip");
 	curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, cfg.timeout);
+	curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
 
 	/* This is required of multi-threaded apps using timeouts. See
 	 * curl_easy_setopt(3) */
@@ -667,8 +668,8 @@ char *curl_get_url_as_buffer(CURL *curl, const char *url) /* {{{ */
 	}
 
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
-	if(!(httpcode == 200 || httpcode == 404)) {
-		cwr_fprintf(stderr, LOG_ERROR, "%s: server responded with http%ld\n",
+	if(httpcode >= 400) {
+		cwr_fprintf(stderr, LOG_ERROR, "%s: server responded with HTTP %ld\n",
 				url, httpcode);
 	}
 
@@ -750,7 +751,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 			break;
 		default:
 			cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-			cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with http%ld\n",
+			cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
 					(const char*)arg, httpcode);
 			goto finish;
 	}
@@ -2055,8 +2056,8 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 	}
 
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
-	if(httpcode >= 300) {
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with http%ld\n",
+	if(httpcode >= 400) {
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
 				(const char*)arg, httpcode);
 		goto finish;
 	}
