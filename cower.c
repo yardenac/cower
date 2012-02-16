@@ -399,13 +399,13 @@ alpm_handle_t *alpm_init(void) /* {{{ */
 		if(line[0] == '[' && line[linelen - 1] == ']') {
 			free(section);
 			section = strndup(&line[1], linelen - 2);
-		}
 
-		if(strcmp(section, "options") != 0) {
-			if(!cfg.skiprepos && !alpm_list_find_str(cfg.ignore.repos, section)) {
-				alpm_db_register_sync(pmhandle, section, 0);
-				cwr_printf(LOG_DEBUG, "registering alpm db: %s\n", section);
-			}
+			if(strcmp(section, "options") != 0) {
+				if(!cfg.skiprepos && !alpm_list_find_str(cfg.ignore.repos, section)) {
+					alpm_db_register_sync(pmhandle, section, 0);
+					cwr_printf(LOG_DEBUG, "registering alpm db: %s\n", section);
+				}
+		}
 		} else {
 			char *key, *token;
 
