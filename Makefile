@@ -36,8 +36,8 @@ install: cower cower.1
 uninstall:
 	@echo removing executable file from ${DESTDIR}${PREFIX}/bin
 	rm -f ${DESTDIR}${PREFIX}/bin/cower
-	@echo removing man page from ${DESTDIR}${PREFIX}/man1/cower.1
-	rm -f ${DESTDIR}/${PREFIX}/man1/cower.1
+	@echo removing man page from ${DESTDIR}${MANPREFIX}/man1/cower.1
+	rm -f ${DESTDIR}/${MANPREFIX}/man1/cower.1
 	@echo removing bash completion
 	rm -f ${DESTDIR}/etc/bash_completion.d/cower
 	@echo removing zsh completion
