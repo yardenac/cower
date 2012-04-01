@@ -5,7 +5,7 @@ VERSION    = $(shell git describe)
 
 SRC        = ${wildcard *.c}
 OBJ        = ${SRC:.c=.o}
-DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c
+DISTFILES  = Makefile cower.1 bash_completion zsh_completion config cower.c
 
 PREFIX    ?= /usr/local
 MANPREFIX ?= ${PREFIX}/share/man
@@ -45,7 +45,7 @@ uninstall:
 	@echo removing sample config
 	rm -f ${DESTDIR}${PREFIX}/share/cower/config
 
-dist: clean
+dist: ${DISTFILES}
 	mkdir cower-${VERSION}
 	cp ${DISTFILES} cower-${VERSION}
 	sed "s/\(^VERSION *\)= .*/\1= ${VERSION}/" Makefile > cower-${VERSION}/Makefile
