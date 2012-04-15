@@ -511,10 +511,10 @@ int archive_extract_file(const struct response_t *file) /* {{{ */
 
 int aurpkg_cmp(const void *p1, const void *p2) /* {{{ */
 {
-	struct aurpkg_t *pkg1 = (struct aurpkg_t*)p1;
-	struct aurpkg_t *pkg2 = (struct aurpkg_t*)p2;
+	const struct aurpkg_t *pkg1 = p1;
+	const struct aurpkg_t *pkg2 = p2;
 
-	return strcmp((const char*)pkg1->name, (const char*)pkg2->name);
+	return strcmp(pkg1->name, pkg2->name);
 } /* }}} */
 
 struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
