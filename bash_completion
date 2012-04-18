@@ -9,8 +9,9 @@ _cower() {
   shopt -q nullglob || { shopt -s nullglob; ng=1; }
 
   opts="-d --download -i --info -m --msearch -s --search -u --update -c --color
-        -f --force --format -h --help --ignore --ignorerepo --listdelim --nossl
-        -q --quiet -t --target --threads -v --verbose --debug"
+        -f --force --format -h --help --ignore -o --ignore-ood --no-ignore-ood
+        --ignorerepo --listdelim --nossl -q --quiet -t --target --threads --debug
+        -v --verbose"
 
   n=${#COMP_WORDS[@]}
 

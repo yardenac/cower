@@ -182,7 +182,8 @@ enum {
 	OP_NOSSL,
 	OP_THREADS,
 	OP_TIMEOUT,
-	OP_VERSION
+	OP_VERSION,
+	OP_NOIGNOREOOD
 };
 
 typedef enum __pkgdetail_t {
@@ -319,7 +320,8 @@ static struct {
 	operation_t opmask;
 	loglevel_t logmask;
 
-	int color;
+	short color;
+	short ignoreood;
 	int extinfo:1;
 	int force:1;
 	int getdeps:1;
@@ -1227,6 +1229,10 @@ int parse_configfile(void) /* {{{ */
 				cwr_printf(LOG_DEBUG, "ignoring package: %s\n", key);
 				cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
 			}
+		} else if(STREQ(key, "IgnoreOOD")) {
+			if(cfg.ignoreood == UNSET) {
+				cfg.ignoreood |= 1;
+			}
 		} else if(STREQ(key, "TargetDir")) {
 			if(val && !cfg.dlpath) {
 				wordexp_t p;
@@ -1297,33 +1303,35 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 
 	static const struct option opts[] = {
 		/* operations */
-		{"download",    no_argument,        0, 'd'},
-		{"info",        no_argument,        0, 'i'},
-		{"msearch",     no_argument,        0, 'm'},
-		{"search",      no_argument,        0, 's'},
-		{"update",      no_argument,        0, 'u'},
+		{"download",      no_argument,        0, 'd'},
+		{"info",          no_argument,        0, 'i'},
+		{"msearch",       no_argument,        0, 'm'},
+		{"search",        no_argument,        0, 's'},
+		{"update",        no_argument,        0, 'u'},
 
 		/* options */
-		{"brief",       no_argument,        0, 'b'},
-		{"color",       optional_argument,  0, 'c'},
-		{"debug",       no_argument,        0, OP_DEBUG},
-		{"force",       no_argument,        0, 'f'},
-		{"format",      required_argument,  0, OP_FORMAT},
-		{"help",        no_argument,        0, 'h'},
-		{"ignore",      required_argument,  0, OP_IGNOREPKG},
-		{"ignorerepo",  optional_argument,  0, OP_IGNOREREPO},
-		{"listdelim",   required_argument,  0, OP_LISTDELIM},
-		{"nossl",       no_argument,        0, OP_NOSSL},
-		{"quiet",       no_argument,        0, 'q'},
-		{"target",      required_argument,  0, 't'},
-		{"threads",     required_argument,  0, OP_THREADS},
-		{"timeout",     required_argument,  0, OP_TIMEOUT},
-		{"verbose",     no_argument,        0, 'v'},
-		{"version",     no_argument,        0, 'V'},
+		{"brief",         no_argument,        0, 'b'},
+		{"color",         optional_argument,  0, 'c'},
+		{"debug",         no_argument,        0, OP_DEBUG},
+		{"force",         no_argument,        0, 'f'},
+		{"format",        required_argument,  0, OP_FORMAT},
+		{"help",          no_argument,        0, 'h'},
+		{"ignore",        required_argument,  0, OP_IGNOREPKG},
+		{"ignore-ood",    no_argument,        0, 'o'},
+		{"no-ignore-ood", no_argument,        0, OP_NOIGNOREOOD},
+		{"ignorerepo",    optional_argument,  0, OP_IGNOREREPO},
+		{"listdelim",     required_argument,  0, OP_LISTDELIM},
+		{"nossl",         no_argument,        0, OP_NOSSL},
+		{"quiet",         no_argument,        0, 'q'},
+		{"target",        required_argument,  0, 't'},
+		{"threads",       required_argument,  0, OP_THREADS},
+		{"timeout",       required_argument,  0, OP_TIMEOUT},
+		{"verbose",       no_argument,        0, 'v'},
+		{"version",       no_argument,        0, 'V'},
 		{0, 0, 0, 0}
 	};
 
-	while((opt = getopt_long(argc, argv, "bcdfhimqst:uvV", opts, &option_index)) != -1) {
+	while((opt = getopt_long(argc, argv, "bcdfhimoqst:uvV", opts, &option_index)) != -1) {
 		char *token;
 
 		switch(opt) {
@@ -1396,6 +1404,9 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 			case OP_FORMAT:
 				cfg.format = optarg;
 				break;
+			case 'o':
+				cfg.ignoreood |= 1;
+				break;
 			case OP_IGNOREPKG:
 				for(token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
 					cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
@@ -1411,6 +1422,9 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 						cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(token));
 					}
 				}
+				break;
+			case OP_NOIGNOREOOD:
+				cfg.ignoreood &= 0;
 				break;
 			case OP_LISTDELIM:
 				cfg.delim = optarg;
@@ -1810,6 +1824,9 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*)) /* {
 
 	for(i = results; i; i = alpm_list_next(i)) {
 		struct aurpkg_t *pkg = i->data;
+
+		if (cfg.ignoreood && pkg->ood)
+			continue;
 
 		/* don't print duplicates */
 		if(!prev || aurpkg_cmp(pkg, prev) != 0) {
@@ -2293,6 +2310,7 @@ int main(int argc, char *argv[]) {
 	cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
 	cfg.secure |= 1;
 	cfg.proto = "https";
+	cfg.ignoreood = UNSET;
 
 	ret = parse_options(argc, argv);
 	switch(ret) {
