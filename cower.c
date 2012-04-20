@@ -1231,7 +1231,7 @@ int parse_configfile(void) /* {{{ */
 			}
 		} else if(STREQ(key, "IgnoreOOD")) {
 			if(cfg.ignoreood == UNSET) {
-				cfg.ignoreood |= 1;
+				cfg.ignoreood = 1;
 			}
 		} else if(STREQ(key, "TargetDir")) {
 			if(val && !cfg.dlpath) {
@@ -1405,7 +1405,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				cfg.format = optarg;
 				break;
 			case 'o':
-				cfg.ignoreood |= 1;
+				cfg.ignoreood = 1;
 				break;
 			case OP_IGNOREPKG:
 				for(token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
@@ -1424,7 +1424,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				}
 				break;
 			case OP_NOIGNOREOOD:
-				cfg.ignoreood &= 0;
+				cfg.ignoreood = 0;
 				break;
 			case OP_LISTDELIM:
 				cfg.delim = optarg;
@@ -2333,7 +2333,7 @@ int main(int argc, char *argv[]) {
 	cfg.maxthreads = cfg.maxthreads == UNSET ? THREAD_DEFAULT : cfg.maxthreads;
 	cfg.timeout = cfg.timeout == UNSET ? TIMEOUT_DEFAULT : cfg.timeout;
 	cfg.color = cfg.color == UNSET ? 0 : cfg.color;
-	cfg.ignoreood = cfg.ignoreood == UNSET ? 0 : 1;
+	cfg.ignoreood = cfg.ignoreood == UNSET ? 0 : cfg.ignoreood;
 
 	if((ret = strings_init()) != 0) {
 		return ret;
