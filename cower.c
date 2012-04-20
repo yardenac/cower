@@ -2262,6 +2262,8 @@ void usage(void) /* {{{ */
 	    "  -c, --color[=WHEN]      use colored output. WHEN is `never', `always', or `auto'\n"
 	    "      --debug             show debug output\n"
 	    "      --format <string>   print package output according to format string\n"
+	    "  -o, --ignore-ood        skip displaying out of date packages\n"
+	    "      --no-ignore-ood     the opposite of --ignore-ood\n"
 	    "      --listdelim <delim> change list format delimeter\n"
 	    "  -q, --quiet             output less\n"
 	    "  -v, --verbose           output more\n\n");
