@@ -264,6 +264,7 @@ static int archive_extract_file(const struct response_t*);
 static int aurpkg_cmp(const void*, const void*);
 static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg);
 static void aurpkg_free(void*);
+static void aurpkg_free_inner(struct aurpkg_t*);
 static CURL *curl_init_easy_handle(CURL*);
 static char *curl_get_url_as_buffer(CURL*, const char*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
@@ -531,31 +532,33 @@ struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
 
 void aurpkg_free(void *pkg) /* {{{ */
 {
-	struct aurpkg_t *it;
+	aurpkg_free_inner(pkg);
+	FREE(pkg);
+} /* }}} */
 
+void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
+{
 	if(!pkg) {
 		return;
 	}
 
-	it = (struct aurpkg_t*)pkg;
+	/* free allocated string fields */
+	FREE(pkg->name);
+	FREE(pkg->maint);
+	FREE(pkg->ver);
+	FREE(pkg->urlpath);
+	FREE(pkg->desc);
+	FREE(pkg->url);
+	FREE(pkg->lic);
 
-	FREE(it->name);
-	FREE(it->maint);
-	FREE(it->ver);
-	FREE(it->desc);
-	FREE(it->url);
-	FREE(it->urlpath);
-	FREE(it->lic);
-
-	FREELIST(it->depends);
-	FREELIST(it->makedepends);
-	FREELIST(it->optdepends);
-	FREELIST(it->provides);
-	FREELIST(it->conflicts);
-	FREELIST(it->replaces);
-
-	FREE(it);
-} /* }}} */
+	/* free extended list info */
+	FREELIST(pkg->depends);
+	FREELIST(pkg->makedepends);
+	FREELIST(pkg->optdepends);
+	FREELIST(pkg->provides);
+	FREELIST(pkg->conflicts);
+	FREELIST(pkg->replaces);
+}
 
 int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
 {
@@ -946,7 +949,11 @@ int json_end_map(void *ctx) /* {{{ */
 
 	p->json_depth--;
 	if(p->json_depth > 0) {
-		p->pkglist = alpm_list_add_sorted(p->pkglist, aurpkg_dup(p->aurpkg), aurpkg_cmp);
+		if(!(p->aurpkg->ood && cfg.ignoreood)) {
+			p->pkglist = alpm_list_add_sorted(p->pkglist, aurpkg_dup(p->aurpkg), aurpkg_cmp);
+		} else {
+			aurpkg_free_inner(p->aurpkg);
+		}
 	}
 
 	return 1;
@@ -1824,9 +1831,6 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*)) /* {
 
 	for(i = results; i; i = alpm_list_next(i)) {
 		struct aurpkg_t *pkg = i->data;
-
-		if (cfg.ignoreood && pkg->ood)
-			continue;
 
 		/* don't print duplicates */
 		if(!prev || aurpkg_cmp(pkg, prev) != 0) {
