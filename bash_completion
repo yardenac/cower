@@ -17,16 +17,11 @@ _cower() {
 
   if [[ $cur = -* ]]; then # options
     COMPREPLY=($(compgen -W "$opts" -- $cur))
-  elif [[ $prev = @(-*t|--target) ]]; then # directories (taken from _cd)
-    compgen -f /non-existing-dir/ >/dev/null
+  elif [[ $prev = @(-*t|--target) ]]; then # directories
     _filedir -d
-    if (( ${#COMPREPLY[@]} == 1 )); then
-      i=${COMPREPLY[0]}
-      [[ $i = $cur && "$i" != */ ]] && COMPREPLY[0]="${i}/"
-    fi
-  elif [[ $prev = --ignore ]]; then
+  elif [[ $prev = --ignore ]]; then # installed packages
     COMPREPLY=($(compgen -W "$(pacman -Qq)" -- $cur))
-  elif [[ $prev = --ignorerepo ]]; then
+  elif [[ $prev = --ignorerepo ]]; then # available repos
     COMPREPLY=($(compgen -W "$(sed '/^\[\(.*\)\]$/!d;s//\1/;/options/d' /etc/pacman.conf)" -- $cur))
   elif [[ ${COMP_WORDS[@]:1:n-2} = *-@(!(-*)@(u)*|-update)* ]]; then # local packages
     COMPREPLY=($(compgen -W "$(pacman -Qqm)" -- $cur))
