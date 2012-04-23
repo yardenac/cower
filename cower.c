@@ -558,7 +558,7 @@ void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
 	FREELIST(pkg->provides);
 	FREELIST(pkg->conflicts);
 	FREELIST(pkg->replaces);
-}
+} /* }}} */
 
 int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
 {
