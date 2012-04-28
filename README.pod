@@ -209,7 +209,7 @@ and falling back to:
 
   $HOME/.config/cower/config
 
-A documented example config file can be found at /usr/share/cower/config.
+A documented example config file can be found at /usr/share/doc/cower/config.
 
 =head1 AUTHOR
 
