@@ -489,7 +489,7 @@ int archive_extract_file(const struct response_t *file) /* {{{ */
 	struct archive *archive;
 	struct archive_entry *entry;
 	const int archive_flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME;
-	int ok, ret = ARCHIVE_OK;
+	int ok, ret = 0;
 
 	archive = archive_read_new();
 	archive_read_support_compression_all(archive);
@@ -500,8 +500,11 @@ int archive_extract_file(const struct response_t *file) /* {{{ */
 		while(archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
 			ok = archive_read_extract(archive, entry, archive_flags);
 			/* NOOP ON ARCHIVE_{OK,WARN,RETRY} */
-			if(ok == ARCHIVE_FATAL || ok == ARCHIVE_EOF) {
-				ret = ok;
+			if(ok == ARCHIVE_FATAL || ok == ARCHIVE_WARN) {
+				ret = archive_errno(archive);
+				break;
+			} else if (ok == ARCHIVE_EOF) {
+				ret = 0;
 				break;
 			}
 		}
@@ -760,17 +763,18 @@ void *download(CURL *curl, void *arg) /* {{{ */
 					(const char*)arg, httpcode);
 			goto finish;
 	}
+
+	ret = archive_extract_file(&response);
+	if(ret != 0) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
+				(const char*)arg, strerror(ret));
+		goto finish;
+	}
+
 	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result->name);
 	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
 			colstr->pkg, result->name, colstr->nc, cfg.dlpath);
-
-	ret = archive_extract_file(&response);
-	if(ret != ARCHIVE_EOF && ret != ARCHIVE_OK) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball\n",
-				(const char*)arg);
-		goto finish;
-	}
 
 	if(cfg.getdeps) {
 		resolve_dependencies(curl, arg);
