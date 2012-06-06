@@ -669,6 +669,7 @@ char *curl_get_url_as_buffer(CURL *curl, const char *url) /* {{{ */
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
+	cwr_printf(LOG_DEBUG, "get_url_as_buffer: curl_easy_perform %s\n", url);
 	curlstat = curl_easy_perform(curl);
 	if(curlstat != CURLE_OK) {
 		cwr_fprintf(stderr, LOG_ERROR, "%s: %s\n", url, curl_easy_strerror(curlstat));
@@ -676,6 +677,7 @@ char *curl_get_url_as_buffer(CURL *curl, const char *url) /* {{{ */
 	}
 
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
+	cwr_printf(LOG_DEBUG, "get_url_as_buffer: %s: server responded with %ld\n", url, httpcode);
 	if(httpcode >= 400) {
 		cwr_fprintf(stderr, LOG_ERROR, "%s: server responded with HTTP %ld\n",
 				url, httpcode);
@@ -744,6 +746,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	free(escaped);
 
+	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char*)arg, url);
 	curlstat = curl_easy_perform(curl);
 
 	if(curlstat != CURLE_OK) {
@@ -753,6 +756,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 	}
 
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
+	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
 
 	switch(httpcode) {
 		case 200:
@@ -2073,7 +2077,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 
-	cwr_printf(LOG_DEBUG, "[%p]: curl_easy_perform %s\n", (void*)pthread_self(), url);
+	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char *)arg, url);
 	curlstat = curl_easy_perform(curl);
 
 	if(curlstat != CURLE_OK) {
@@ -2083,6 +2087,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 	}
 
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
+	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
 	if(httpcode >= 400) {
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
 				(const char*)arg, httpcode);
@@ -2409,12 +2414,10 @@ int main(int argc, char *argv[]) {
 					strerror(ret));
 			return(ret); /* we don't want to recover from this */
 		}
-		cwr_printf(LOG_DEBUG, "[%p]: spawned\n", (void*)threads[n]);
 	}
 
 	for(n = 0; n < num_threads; n++) {
 		pthread_join(threads[n], (void**)&thread_return);
-		cwr_printf(LOG_DEBUG, "[%p]: joined\n", (void*)threads[n]);
 		results = alpm_list_join(results, thread_return);
 	}
 
