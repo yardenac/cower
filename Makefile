@@ -29,7 +29,7 @@ strip: ${OUT}
 install: cower cower.1
 	install -D -m755 cower ${DESTDIR}${PREFIX}/bin/cower
 	install -D -m644 cower.1 ${DESTDIR}${MANPREFIX}/man1/cower.1
-	install -D -m644 bash_completion ${DESTDIR}/etc/bash_completion.d/cower
+	install -D -m644 bash_completion ${DESTDIR}/usr/share/bash-completion/completions/cower
 	install -D -m644 zsh_completion ${DESTDIR}${PREFIX}/share/zsh/site-functions/_cower
 	install -D -m644 config ${DESTDIR}${PREFIX}/share/doc/cower/config
 
