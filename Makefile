@@ -43,7 +43,7 @@ uninstall:
 	@echo removing zsh completion
 	rm -f ${DESTDIR}${PREFIX}/share/zsh/site-functions/_cower
 	@echo removing sample config
-	rm -f ${DESTDIR}${PREFIX}/share/cower/config
+	rm -f ${DESTDIR}${PREFIX}/share/doc/cower/config
 
 dist: clean
 	mkdir cower-${VERSION}
