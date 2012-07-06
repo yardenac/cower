@@ -510,7 +510,7 @@ int archive_extract_file(const struct response_t *file) /* {{{ */
 		}
 		archive_read_close(archive);
 	}
-	archive_read_finish(archive);
+	archive_read_free(archive);
 
 	return ret;
 } /* }}} */
