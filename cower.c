@@ -43,6 +43,7 @@
 /* external libs */
 #include <alpm.h>
 #include <archive.h>
+#include <archive_entry.h>
 #include <curl/curl.h>
 #include <openssl/crypto.h>
 #include <yajl/yajl_parse.h>
@@ -260,9 +261,9 @@ static alpm_list_t *alpm_find_foreign_pkgs(void);
 static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
-static int archive_extract_file(const struct response_t*);
+static int archive_extract_file(const struct response_t*, char**);
 static int aurpkg_cmp(const void*, const void*);
-static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg);
+static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(struct aurpkg_t*);
 static CURL *curl_init_easy_handle(CURL*);
@@ -272,13 +273,13 @@ static int cwr_asprintf(char**, const char*, ...) __attribute__((format(printf,2
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
-static void *download(CURL *curl, void *arg);
+static void *download(CURL *curl, void*);
 static alpm_list_t *filter_results(alpm_list_t*);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static void indentprint(const char*, int);
 static int json_end_map(void*);
-static int json_integer(void *ctx, long long val);
+static int json_integer(void *ctx, long long);
 static int json_map_key(void*, const unsigned char*, size_t);
 static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
@@ -297,7 +298,7 @@ static void print_pkg_formatted(struct aurpkg_t*);
 static void print_pkg_info(struct aurpkg_t*);
 static void print_pkg_search(struct aurpkg_t*);
 static void print_results(alpm_list_t*, void (*)(struct aurpkg_t*));
-static int resolve_dependencies(CURL*, const char*);
+static int resolve_dependencies(CURL*, const char*, const char*);
 static int set_working_dir(void);
 static int strings_init(void);
 static size_t strtrim(char*);
@@ -484,20 +485,36 @@ const char *alpm_provides_pkg(const char *pkgname) /* {{{ */
 	return dbname;
 } /* }}} */
 
-int archive_extract_file(const struct response_t *file) /* {{{ */
+int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 {
 	struct archive *archive;
 	struct archive_entry *entry;
 	const int archive_flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME;
-	int ok, ret = 0;
+	int want_subdir = subdir != NULL, ok, ret = 0;
 
 	archive = archive_read_new();
 	archive_read_support_compression_all(archive);
 	archive_read_support_format_all(archive);
 
+	want_subdir = (subdir != NULL);
+
 	ret = archive_read_open_memory(archive, file->data, file->size);
 	if(ret == ARCHIVE_OK) {
 		while(archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+			const char *entryname = archive_entry_pathname(entry);
+
+			if(want_subdir) {
+				if(entryname) {
+					size_t len = strlen(entryname);
+					if(entryname[len - 1] == '/') {
+						*subdir = strndup(entryname, len - 1);
+						want_subdir = 0;
+					}
+				}
+			}
+
+			cwr_printf(LOG_DEBUG, "extracting file: %s\n", entryname);
+
 			ok = archive_read_extract(archive, entry, archive_flags);
 			/* NOOP ON ARCHIVE_{OK,WARN,RETRY} */
 			if(ok == ARCHIVE_FATAL || ok == ARCHIVE_WARN) {
@@ -511,6 +528,11 @@ int archive_extract_file(const struct response_t *file) /* {{{ */
 		archive_read_close(archive);
 	}
 	archive_read_free(archive);
+
+	if(want_subdir && *subdir == NULL) {
+		/* massively broken PKGBUILD without a subdir... */
+		*subdir = strdup("");
+	}
 
 	return ret;
 } /* }}} */
@@ -713,7 +735,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 	alpm_list_t *queryresult = NULL;
 	struct aurpkg_t *result;
 	CURLcode curlstat;
-	char *url, *escaped;
+	char *url, *escaped, *subdir = NULL;
 	int ret;
 	long httpcode;
 	struct response_t response = { 0, 0 };
@@ -768,7 +790,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 			goto finish;
 	}
 
-	ret = archive_extract_file(&response);
+	ret = archive_extract_file(&response, &subdir);
 	if(ret != 0) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
@@ -781,12 +803,13 @@ void *download(CURL *curl, void *arg) /* {{{ */
 			colstr->pkg, result->name, colstr->nc, cfg.dlpath);
 
 	if(cfg.getdeps) {
-		resolve_dependencies(curl, arg);
+		resolve_dependencies(curl, arg, subdir);
 	}
 
 finish:
 	FREE(url);
 	FREE(response.data);
+	FREE(subdir);
 
 	return queryresult;
 } /* }}} */
@@ -1848,7 +1871,7 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*)) /* {
 	}
 } /* }}} */
 
-int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
+int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir) /* {{{ */
 {
 	const alpm_list_t *i;
 	alpm_list_t *deplist = NULL;
@@ -1857,7 +1880,7 @@ int resolve_dependencies(CURL *curl, const char *pkgname) /* {{{ */
 
 	curl = curl_init_easy_handle(curl);
 
-	cwr_asprintf(&filename, "%s/%s/PKGBUILD", cfg.dlpath, pkgname);
+	cwr_asprintf(&filename, "%s/%s/PKGBUILD", cfg.dlpath, subdir ? subdir : pkgname);
 
 	pkgbuild = get_file_as_buffer(filename);
 	if(!pkgbuild) {
