@@ -505,9 +505,10 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 
 			if(want_subdir) {
 				if(entryname) {
-					size_t len = strlen(entryname);
-					if(entryname[len - 1] == '/') {
-						*subdir = strndup(entryname, len - 1);
+					const struct stat *st = archive_entry_stat(entry);
+					if (S_ISDIR(st->st_mode)) {
+						size_t len = strlen(entryname);
+						*subdir = strndup(entryname, entryname[len - 1] == '/' ? len - 1 : len);
 						want_subdir = 0;
 					}
 				}
