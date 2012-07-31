@@ -1370,7 +1370,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 		{0, 0, 0, 0}
 	};
 
-	while((opt = getopt_long(argc, argv, "bcdfhimoqst:uvV", opts, &option_index)) != -1) {
+	while((opt = getopt_long(argc, argv, "bc::dfhimoqst:uvV", opts, &option_index)) != -1) {
 		char *token;
 
 		switch(opt) {
