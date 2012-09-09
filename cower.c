@@ -948,7 +948,7 @@ void indentprint(const char *str, int indent) /* {{{ */
 
 	/* if we're not a tty, print without indenting */
 	if(cols == 0) {
-		printf("%s", str);
+		fputs(str, stdout);
 		return;
 	}
 
@@ -987,7 +987,7 @@ void indentprint(const char *str, int indent) /* {{{ */
 				printf("\n%-*s", indent, "");
 				cidx = indent;
 			} else {
-				printf(" ");
+				fputc(' ', stdout);
 				cidx++;
 			}
 			continue;
@@ -1664,7 +1664,7 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 			printf("%-*c", INFO_INDENT + 1, '\n');
 			count = INFO_INDENT;
 		}
-		count += printf("%s", (const char*)i->data);
+		count += fputs(i->data, stdout);
 		if(next) {
 			count += print_escaped(delim);
 		}
@@ -2324,16 +2324,16 @@ void usage(void) /* {{{ */
 
 void version(void) /* {{{ */
 {
-	printf("\n  " COWER_VERSION "\n");
-	printf("     \\\n"
-	       "      \\\n"
-	       "        ,__, |    |\n"
-	       "        (oo)\\|    |___\n"
-	       "        (__)\\|    |   )\\_\n"
-	       "          U  |    |_w |  \\\n"
-	       "             |    |  ||   *\n"
-	       "\n"
-	       "             Cower....\n\n");
+	fputs("\n  " COWER_VERSION "\n", stdout);
+	fputs("     \\\n"
+	      "      \\\n"
+	      "        ,__, |    |\n"
+	      "        (oo)\\|    |___\n"
+	      "        (__)\\|    |   )\\_\n"
+	      "          U  |    |_w |  \\\n"
+	      "             |    |  ||   *\n"
+	      "\n"
+	      "             Cower....\n\n", stdout);
 } /* }}} */
 
 size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream) /* {{{ */
