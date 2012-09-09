@@ -15,18 +15,21 @@ CFLAGS    := -std=c99 -g -pedantic -Wall -Wextra -pthread $(CFLAGS)
 LDFLAGS   := -pthread $(LDFLAGS)
 LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto
 
+MANPAGES = \
+	cower.1
+
 all: $(OUT) doc
 
 $(OUT): $(OBJ)
 
-doc: cower.1
+doc: $(MANPAGES)
 cower.1: README.pod
 	pod2man --section=1 --center="Cower Manual" --name="COWER" --release="cower $(VERSION)" $< > $@
 
 strip: $(OUT)
 	strip --strip-all $(OUT)
 
-install: cower cower.1
+install: all
 	install -D -m755 cower $(DESTDIR)$(PREFIX)/bin/cower
 	install -D -m644 cower.1 $(DESTDIR)$(MANPREFIX)/man1/cower.1
 	install -D -m644 bash_completion $(DESTDIR)/usr/share/bash-completion/completions/cower
@@ -58,7 +61,7 @@ distcheck: dist
 	rm -rf cower-$(VERSION)
 
 clean:
-	$(RM) $(OUT) $(OBJ) cower.1
+	$(RM) $(OUT) $(OBJ) $(MANPAGES)
 
 .PHONY: clean dist doc install uninstall
 
