@@ -1210,14 +1210,20 @@ int parse_configfile(void) /* {{{ */
 
 	xdg_config_home = getenv("XDG_CONFIG_HOME");
 	if(xdg_config_home) {
-		cwr_asprintf(&config_path, "%s/cower/config", xdg_config_home);
+		if(asprintf(&config_path, "%s/cower/config", xdg_config_home) < 0) {
+			fprintf(stderr, "error: failed to allocate string\n");
+			return 1;
+		}
 	} else {
 		home = getenv("HOME");
 		if(!home) {
-			cwr_fprintf(stderr, LOG_ERROR, "Unable to find path to config file.\n");
+			cwr_printf(LOG_DEBUG, "unable to find path to config file\n");
+			return 0;
+		}
+		if(asprintf(&config_path, "%s/.config/cower/config", home) < 0) {
+			fprintf(stderr, "error: failed to allocate string\n");
 			return 1;
 		}
-		cwr_asprintf(&config_path, "%s/.config/cower/config", getenv("HOME"));
 	}
 
 	fp = fopen(config_path, "r");
@@ -1944,7 +1950,8 @@ int set_working_dir(void) /* {{{ */
 
 	resolved = cfg.dlpath ? realpath(cfg.dlpath, NULL) : getcwd(NULL, 0);
 	if(!resolved) {
-		cwr_fprintf(stderr, LOG_ERROR, "%s: %s\n", cfg.dlpath, strerror(errno));
+		fprintf(stderr, "error: failed to resolve download path %s: %s\n",
+				cfg.dlpath, strerror(errno));
 		FREE(cfg.dlpath);
 		return 1;
 	}
@@ -1953,18 +1960,17 @@ int set_working_dir(void) /* {{{ */
 	cfg.dlpath = resolved;
 
 	if(access(cfg.dlpath, W_OK) != 0) {
-		cwr_fprintf(stderr, LOG_ERROR, "cannot write to %s: %s\n",
+		fprintf(stderr, "error: cannot write to %s: %s\n",
 				cfg.dlpath, strerror(errno));
 		FREE(cfg.dlpath);
 		return 1;
 	}
 
 	if(chdir(cfg.dlpath) != 0) {
-		cwr_fprintf(stderr, LOG_ERROR, "%s: %s\n", cfg.dlpath, strerror(errno));
+		fprintf(stderr, "error: failed to chdir to %s: %s\n", cfg.dlpath,
+				strerror(errno));
 		return 1;
 	}
-
-	cwr_printf(LOG_DEBUG, "working directory set to: %s\n", cfg.dlpath);
 
 	return 0;
 } /* }}} */
