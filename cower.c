@@ -31,6 +31,7 @@
 #include <getopt.h>
 #include <locale.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <regex.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -277,6 +278,7 @@ static void *download(CURL *curl, void*);
 static alpm_list_t *filter_results(alpm_list_t*);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
+static int get_config_path(char *config_path, size_t pathlen);
 static void indentprint(const char*, int);
 static int json_end_map(void*);
 static int json_integer(void *ctx, long long);
@@ -906,6 +908,32 @@ char *get_file_as_buffer(const char *path) /* {{{ */
 	return buf;
 } /* }}} */
 
+int get_config_path(char *config_path, size_t pathlen) /* {{{ */
+{
+	char *var;
+	struct passwd *pwd;
+
+	var = getenv("XDG_CONFIG_HOME");
+	if(var != NULL) {
+		snprintf(config_path, pathlen, "%s/cower/config", var);
+		return 0;
+	}
+
+	var = getenv("HOME");
+	if(var != NULL) {
+		snprintf(config_path, pathlen, "%s/.config/cower/config", var);
+		return 0;
+	}
+
+	pwd = getpwuid(getuid());
+	if(pwd != NULL && pwd->pw_dir != NULL) {
+		snprintf(config_path, pathlen, "%s/.config/cower/config", pwd->pw_dir);
+		return 0;
+	}
+
+	return 1;
+} /* }}} */
+
 void indentprint(const char *str, int indent) /* {{{ */
 {
 	wchar_t *wcstr;
@@ -1203,27 +1231,12 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 
 int parse_configfile(void) /* {{{ */
 {
-	char *xdg_config_home, *home, *config_path;
-	char line[PATH_MAX];
+	char line[BUFSIZ], config_path[PATH_MAX];
 	int ret = 0;
 	FILE *fp;
 
-	xdg_config_home = getenv("XDG_CONFIG_HOME");
-	if(xdg_config_home) {
-		if(asprintf(&config_path, "%s/cower/config", xdg_config_home) < 0) {
-			fprintf(stderr, "error: failed to allocate string\n");
-			return 1;
-		}
-	} else {
-		home = getenv("HOME");
-		if(!home) {
-			cwr_printf(LOG_DEBUG, "unable to find path to config file\n");
-			return 0;
-		}
-		if(asprintf(&config_path, "%s/.config/cower/config", home) < 0) {
-			fprintf(stderr, "error: failed to allocate string\n");
-			return 1;
-		}
+	if(get_config_path(config_path, sizeof(config_path)) != 0) {
+		return 0;
 	}
 
 	fp = fopen(config_path, "r");
@@ -1231,9 +1244,6 @@ int parse_configfile(void) /* {{{ */
 		cwr_printf(LOG_DEBUG, "config file not found. skipping parsing\n");
 		return 0; /* not an error, just nothing to do here */
 	}
-
-	/* don't need this anymore, get rid of it ASAP */
-	free(config_path);
 
 	while(fgets(line, PATH_MAX, fp)) {
 		char *key, *val;
