@@ -1005,7 +1005,7 @@ void indentprint(const char *str, int indent) /* {{{ */
 
 int json_end_map(void *ctx) /* {{{ */
 {
-	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
+	struct yajl_parser_t *p = ctx;
 
 	p->json_depth--;
 	if(p->json_depth > 0) {
@@ -1021,7 +1021,7 @@ int json_end_map(void *ctx) /* {{{ */
 
 int json_integer(void *ctx, long long val) /* {{{ */
 {
-	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
+	struct yajl_parser_t *p = ctx;
 
 	if(KEY_IS(AUR_ID)) {
 		p->aurpkg->id = (int)val;
@@ -1044,7 +1044,7 @@ int json_integer(void *ctx, long long val) /* {{{ */
 
 int json_map_key(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
-	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
+	struct yajl_parser_t *p = ctx;
 
 	p->keysz = size;
 	memcpy(p->key, (const char*)data, size);
@@ -1055,7 +1055,7 @@ int json_map_key(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 
 int json_start_map(void *ctx) /* {{{ */
 {
-	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
+	struct yajl_parser_t *p = ctx;
 
 	p->json_depth++;
 	if(p->json_depth > 1) {
@@ -1067,7 +1067,7 @@ int json_start_map(void *ctx) /* {{{ */
 
 int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
-	struct yajl_parser_t *p = (struct yajl_parser_t*)ctx;
+	struct yajl_parser_t *p = ctx;
 	char buffer[32];
 
 	if(KEY_IS(AUR_QUERY_TYPE) &&
