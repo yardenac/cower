@@ -33,20 +33,21 @@ Search for packages maintained by I<target>.
 
 Search for packages with the I<target>(s) as the search term(s). Queries with
 multiple targets will return the result of the intersection of all query
-results. Extended regex patterns as defined by POSIX are allowed.
+results. Extended regex patterns as defined by POSIX in B<regex>(7) are
+allowed.
 
 B<Note:> Regex is more or less implemented as a hack, since the AUR does not
-actually support this. cower will search based on the first span of 2 non-regex
-characters it finds and filter using the regular expression provided,
-afterwards. There's no guarantee that complex patterns will return accurate
-results.
+actually support this. cower will search based on the first span of at least 2
+consecutive non-regex characters it finds and will filter using the regular
+expression provided, afterwards. There's no guarantee that complex patterns
+will return expected results.
 
 =item B<-u, --update>
 
 Check foreign packages for updates in the AUR. Without any arguments, all
 manually installed packages will be checked. If targets are supplied, only
 those targets will be checked. This operation can be combined with the
---download operation.
+B<--download> operation.
 
 =back
 
@@ -62,8 +63,8 @@ for some sort of automation.
 
 =item B<-c>, B<--color>[B<=>I<WHEN>]
 
-Use colored output. WHEN is `always' or `auto'. Color will be disabled in a
-pipe unless WHEN is set to always.
+Use colored output. I<WHEN> is B<never>, B<always> or B<auto>. Color will be
+disabled in a pipe unless I<WHEN> is set to always.
 
 =item B<--debug>
 
@@ -75,8 +76,8 @@ Overwrite existing files when downloading.
 
 =item B<--format=>I<FORMAT>
 
-Print outside from --info, --search, and --msearch operations described by the
-provided format string. See the FORMATTING section.
+Print outside from B<--info>, B<--search>, and B<--msearch> operations
+described by the provided format string. See the FORMATTING section.
 
 =item B<-h, --help>
 
@@ -98,8 +99,8 @@ is queried.
 =item B<--listdelim=>I<STRING>
 
 Specify a delimiter when printing list formatters, default to 2 spaces. This
-option only has an effect when using the -ii operation combined with --format.
-See the FORMATTING section.
+option only has an effect when using the B<-ii> operation combined with
+B<--format>.  See the FORMATTING section.
 
 =item B<--no-ignore-ood>
 
@@ -126,7 +127,7 @@ or absolute path can be specified, but all components of the path must exist.
 
 Limit the number of threads created, with a default of 10. In practice, you
 should never need to bother with this setting. Other than the case of an
---update operation with no targets specified, a thread is created for each
+B<--update> operation with no targets specified, a thread is created for each
 target provided to cower. If cower has fewer targets than threads specified,
 the number of threads created will instead be the number of targets.
 
@@ -148,8 +149,9 @@ Display version and exit.
 
 =head1 FORMATTING
 
-When the B<--format> option is used with the --search, --msearch, or --info
-operations, the following sequences are interpreted within the formatter::
+When the B<--format> option is used with the B<--search>, B<--msearch>, or
+B<--info> operations, the following sequences are interpreted within the
+formatter:
 
   %a    last modified
 
@@ -179,9 +181,9 @@ operations, the following sequences are interpreted within the formatter::
 
   %%    a literal %
 
-When --info is specified twice, the following formatters are also available (if
-the PKGBUILD specifies them). Items in these lists are delimited according to
-the --listdelim option.
+When B<--info> is specified twice, the following formatters are also available
+(if the PKGBUILD specifies them). Items in these lists are delimited according
+to the B<--listdelim> option.
 
   %C    conflicts
 
