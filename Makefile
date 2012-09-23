@@ -20,8 +20,6 @@ MANPAGES = \
 
 all: $(OUT) doc
 
-$(OUT): $(OBJ)
-
 doc: $(MANPAGES)
 cower.1: README.pod
 	pod2man --section=1 --center="Cower Manual" --name="COWER" --release="cower $(VERSION)" $< $@
