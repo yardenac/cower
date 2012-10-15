@@ -506,13 +506,11 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 			const char *entryname = archive_entry_pathname(entry);
 
 			if(want_subdir) {
-				if(entryname) {
-					const struct stat *st = archive_entry_stat(entry);
-					if (S_ISDIR(st->st_mode)) {
-						size_t len = strlen(entryname);
-						*subdir = strndup(entryname, entryname[len - 1] == '/' ? len - 1 : len);
-						want_subdir = 0;
-					}
+				size_t entrylen = strlen(entryname);
+				if(strcmp(&entryname[entrylen - sizeof("PKGBUILD")], "/PKGBUILD") == 0) {
+					*subdir = strndup(entryname, entrylen - sizeof("PKGBUILD"));
+					cwr_printf(LOG_DEBUG, "found subdir: %s\n", *subdir);
+					want_subdir = 0;
 				}
 			}
 
