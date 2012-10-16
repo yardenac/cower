@@ -10,7 +10,8 @@ Usage: I<cower> E<lt>operationE<gt> [ options ] [ targets ]
 
 cower is a simple tool to get information and download packages from the Arch
 User Repository (AUR). Invoking cower consists of supplying an operation, any
-applicable options, and usually one or more targets.
+applicable options, and usually one or more targets. If a target is specified
+as a lone dash (-), additional targets will be read from stdin.
 
 =head1 OPERATIONS
 

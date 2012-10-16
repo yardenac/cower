@@ -299,6 +299,7 @@ static void print_pkg_formatted(struct aurpkg_t*);
 static void print_pkg_info(struct aurpkg_t*);
 static void print_pkg_search(struct aurpkg_t*);
 static void print_results(alpm_list_t*, void (*)(struct aurpkg_t*));
+static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static int resolve_dependencies(CURL*, const char*, const char*);
 static int set_working_dir(void);
 static int strings_init(void);
@@ -1505,7 +1506,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 
 	while(optind < argc) {
 		if(!alpm_list_find_str(cfg.targets, argv[optind])) {
-			cwr_fprintf(stderr, LOG_DEBUG, "adding target: %s\n", argv[optind]);
+			cwr_printf(LOG_DEBUG, "adding target: %s\n", argv[optind]);
 			cfg.targets = alpm_list_add(cfg.targets, strdup(argv[optind]));
 		}
 		optind++;
@@ -2331,6 +2332,38 @@ size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream) /* 
 	return realsize;
 } /* }}} */
 
+int read_targets_from_file(FILE *in, alpm_list_t **targets) { /* {{{ */
+	char line[BUFSIZ];
+	int i = 0, end = 0;
+	while(!end) {
+		line[i] = fgetc(in);
+
+		if(line[i] == EOF) {
+			end = 1;
+		}
+
+		if(isspace(line[i]) || end) {
+			line[i] = '\0';
+			/* avoid adding zero length arg, if multiple spaces separate args */
+			if(i > 0) {
+				if(!alpm_list_find_str(*targets, line)) {
+					cwr_printf(LOG_DEBUG, "adding target: %s\n", line);
+					*targets = alpm_list_add(*targets, strdup(line));
+				}
+				i = 0;
+			}
+		} else {
+			++i;
+			if(i >= BUFSIZ) {
+				cwr_fprintf(stderr, LOG_ERROR, "buffer overflow detected in stdin\n");
+				return -1;
+			}
+		}
+	}
+
+	return 0;
+} /* }}} */
+
 int main(int argc, char *argv[]) {
 	alpm_list_t *results = NULL, *thread_return = NULL;
 	int ret, n, num_threads;
@@ -2376,6 +2409,20 @@ int main(int argc, char *argv[]) {
 
 	if((ret = set_working_dir()) != 0) {
 		goto finish;
+	}
+
+	if(alpm_list_find_str(cfg.targets, "-")) {
+		char *vdata;
+		cfg.targets = alpm_list_remove_str(cfg.targets, "-", &vdata);
+		free(vdata);
+		cwr_printf(LOG_DEBUG, "reading targets from stdin\n");
+		ret = read_targets_from_file(stdin, &cfg.targets);
+		if(ret != 0) {
+			goto finish;
+		}
+		if(!freopen(ctermid(NULL), "r", stdin)) {
+			cwr_printf(LOG_DEBUG, "failed to reopen stdin for reading\n");
+		}
 	}
 
 	cwr_printf(LOG_DEBUG, "initializing curl\n");
