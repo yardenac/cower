@@ -1657,12 +1657,14 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 	}
 
 	for(i = list; i; i = next) {
+		size_t data_len = strlen(i->data);
 		next = alpm_list_next(i);
-		if(wrap && cols > 0 && count + strlen(i->data) >= cols) {
+		if(wrap && cols > 0 && count + data_len >= cols) {
 			printf("%-*c", INFO_INDENT + 1, '\n');
 			count = INFO_INDENT;
 		}
-		count += fputs(i->data, stdout);
+		count += data_len;
+		fputs(i->data, stdout);
 		if(next) {
 			count += print_escaped(delim);
 		}
