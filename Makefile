@@ -35,16 +35,11 @@ install: all
 	install -D -m644 config $(DESTDIR)$(PREFIX)/share/doc/cower/config
 
 uninstall:
-	@echo removing executable file from $(DESTDIR)$(PREFIX)/bin
-	rm -f $(DESTDIR)$(PREFIX)/bin/cower
-	@echo removing man page from $(DESTDIR)$(MANPREFIX)/man1/cower.1
-	rm -f $(DESTDIR)/$(MANPREFIX)/man1/cower.1
-	@echo removing bash completion
-	rm -f $(DESTDIR)/etc/bash_completion.d/cower
-	@echo removing zsh completion
-	rm -f $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower
-	@echo removing sample config
-	rm -f $(DESTDIR)$(PREFIX)/share/doc/cower/config
+	$(RM) $(DESTDIR)$(PREFIX)/bin/cower \
+		$(DESTDIR)/$(MANPREFIX)/man1/cower.1 \
+		$(DESTDIR)/etc/bash_completion.d/cower \
+		$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower \
+		$(DESTDIR)$(PREFIX)/share/doc/cower/config
 
 dist: clean
 	mkdir cower-$(VERSION)

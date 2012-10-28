@@ -72,9 +72,9 @@
 
 #define COWER_USERAGENT       "cower/3.x"
 
-#define AUR_BASE_URL          "%s://aur.archlinux.org%s"
-#define AUR_PKG_URL_FORMAT    "%s://aur.archlinux.org/packages.php?ID="
-#define AUR_RPC_URL           "%s://aur.archlinux.org/rpc.php?type=%s&arg=%s"
+#define AUR_BASE_URL          "https://aur.archlinux.org%s"
+#define AUR_PKG_URL_FORMAT    "https://aur.archlinux.org/packages.php?ID="
+#define AUR_RPC_URL           "https://aur.archlinux.org/rpc.php?type=%s&arg=%s"
 #define THREAD_DEFAULT        10
 #define TIMEOUT_DEFAULT       10L
 #define UNSET                 -1
@@ -181,7 +181,6 @@ enum {
 	OP_IGNOREPKG,
 	OP_IGNOREREPO,
 	OP_LISTDELIM,
-	OP_NOSSL,
 	OP_THREADS,
 	OP_TIMEOUT,
 	OP_VERSION,
@@ -319,7 +318,6 @@ static struct {
 	char *dlpath;
 	const char *delim;
 	const char *format;
-	const char *proto;
 
 	operation_t opmask;
 	loglevel_t logmask;
@@ -331,7 +329,6 @@ static struct {
 	int getdeps:1;
 	int quiet:1;
 	int skiprepos:1;
-	int secure:1;
 	int maxthreads;
 	long timeout;
 
@@ -765,7 +762,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 
 	result = queryresult->data;
 	escaped = url_escape(result->urlpath, 0, "/");
-	cwr_asprintf(&url, AUR_BASE_URL, cfg.proto, escaped);
+	cwr_asprintf(&url, AUR_BASE_URL, escaped);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	free(escaped);
 
@@ -1118,10 +1115,6 @@ void openssl_crypto_cleanup(void) /* {{{ */
 {
 	int i;
 
-	if(!cfg.secure) {
-		return;
-	}
-
 	CRYPTO_set_locking_callback(NULL);
 
 	for(i = 0; i < CRYPTO_num_locks(); i++) {
@@ -1269,10 +1262,7 @@ int parse_configfile(void) /* {{{ */
 
 		/* colors are not initialized in this section, so usage of cwr_printf
 		 * functions is verboten unless we're using loglevel_t LOG_DEBUG */
-		if(STREQ(key, "NoSSL")) {
-			cfg.secure &= 0;
-			cfg.proto = "http";
-		} else if(STREQ(key, "IgnoreRepo")) {
+		if(STREQ(key, "IgnoreRepo")) {
 			for(key = strtok(val, " "); key; key = strtok(NULL, " ")) {
 				cwr_printf(LOG_DEBUG, "ignoring repo: %s\n", key);
 				cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(key));
@@ -1374,7 +1364,6 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 		{"no-ignore-ood", no_argument,        0, OP_NOIGNOREOOD},
 		{"ignorerepo",    optional_argument,  0, OP_IGNOREREPO},
 		{"listdelim",     required_argument,  0, OP_LISTDELIM},
-		{"nossl",         no_argument,        0, OP_NOSSL},
 		{"quiet",         no_argument,        0, 'q'},
 		{"target",        required_argument,  0, 't'},
 		{"threads",       required_argument,  0, OP_THREADS},
@@ -1481,10 +1470,6 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				break;
 			case OP_LISTDELIM:
 				cfg.delim = optarg;
-				break;
-			case OP_NOSSL:
-				cfg.secure &= 0;
-				cfg.proto = "http";
 				break;
 			case OP_THREADS:
 				cfg.maxthreads = strtol(optarg, &token, 10);
@@ -1718,7 +1703,7 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 					printf(fmt, buf);
 					break;
 				case 'p':
-					snprintf(buf, 64, AUR_PKG_URL_FORMAT "%d", cfg.proto, pkg->id);
+					snprintf(buf, 64, AUR_PKG_URL_FORMAT "%d", pkg->id);
 					printf(fmt, buf);
 					break;
 				case 's':
@@ -1799,7 +1784,7 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 			pkg->ood ? colstr->ood : colstr->utd, pkg->ver, colstr->nc);
 	printf(URL "            : %s%s%s\n", colstr->url, pkg->url, colstr->nc);
 	printf(PKG_AURPAGE "       : %s" AUR_PKG_URL_FORMAT "%d%s\n",
-			colstr->url, cfg.proto, pkg->id, colstr->nc);
+			colstr->url, pkg->id, colstr->nc);
 
 	print_extinfo_list(pkg->depends, PKG_DEPENDS, LIST_DELIM, 1);
 	print_extinfo_list(pkg->makedepends, PKG_MAKEDEPENDS, LIST_DELIM, 1);
@@ -2109,11 +2094,11 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 
 	escaped = url_escape((char*)argstr, span, NULL);
 	if(cfg.opmask & OP_SEARCH) {
-		cwr_asprintf(&url, AUR_RPC_URL, cfg.proto, AUR_QUERY_TYPE_SEARCH, escaped);
+		cwr_asprintf(&url, AUR_RPC_URL, AUR_QUERY_TYPE_SEARCH, escaped);
 	} else if(cfg.opmask & OP_MSEARCH) {
-		cwr_asprintf(&url, AUR_RPC_URL, cfg.proto, AUR_QUERY_TYPE_MSRCH, escaped);
+		cwr_asprintf(&url, AUR_RPC_URL, AUR_QUERY_TYPE_MSRCH, escaped);
 	} else {
-		cwr_asprintf(&url, AUR_RPC_URL, cfg.proto, AUR_QUERY_TYPE_INFO, escaped);
+		cwr_asprintf(&url, AUR_RPC_URL, AUR_QUERY_TYPE_INFO, escaped);
 	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 
@@ -2144,7 +2129,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 
 		aurpkg = pkglist->data;
 		escaped = url_escape(aurpkg->urlpath, 0, "/");
-		cwr_asprintf(&pburl, AUR_BASE_URL, cfg.proto, escaped);
+		cwr_asprintf(&pburl, AUR_BASE_URL, escaped);
 		memcpy(strrchr(pburl, '/') + 1, "PKGBUILD\0", 9);
 
 		pkgbuild = curl_get_url_as_buffer(curl, pburl);
@@ -2305,7 +2290,6 @@ void usage(void) /* {{{ */
 	    "  -h, --help              display this help and exit\n"
 	    "      --ignore <pkg>      ignore a package upgrade (can be used more than once)\n"
 	    "      --ignorerepo <repo> ignore some or all binary repos\n"
-	    "      --nossl             do not use https connections\n"
 	    "  -t, --target <dir>      specify an alternate download directory\n"
 	    "      --threads <num>     limit number of threads created\n"
 	    "      --timeout <num>     specify connection timeout in seconds\n"
@@ -2363,8 +2347,6 @@ int main(int argc, char *argv[]) {
 	cfg.color = cfg.maxthreads = cfg.timeout = UNSET;
 	cfg.delim = LIST_DELIM;
 	cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
-	cfg.secure |= 1;
-	cfg.proto = "https";
 	cfg.ignoreood = UNSET;
 
 	ret = parse_options(argc, argv);
@@ -2397,12 +2379,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	cwr_printf(LOG_DEBUG, "initializing curl\n");
-	if(cfg.secure) {
-		ret = curl_global_init(CURL_GLOBAL_SSL);
-		openssl_crypto_init();
-	} else {
-		ret = curl_global_init(CURL_GLOBAL_NOTHING);
-	}
+	ret = curl_global_init(CURL_GLOBAL_ALL);
+	openssl_crypto_init();
+
 	if(ret != 0) {
 		cwr_fprintf(stderr, LOG_ERROR, "failed to initialize curl\n");
 		goto finish;

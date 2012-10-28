@@ -17,7 +17,6 @@ _cower_opts_general=(
           _cower_completions_installed_packages'
   '*--ignorerepo[Ignore some or all binary repos]:repositories:
           _cower_completions_repositories'
-  '--nossl[Do not use https connections]'
   '-t[Specify an alternate download directory]:target:_files -/'
   '--threads[Limit number of threads created]:number of threads'
   '--timeout[Specify connection timeout in seconds]:timeout'

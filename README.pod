@@ -106,10 +106,6 @@ B<--format>.  See the FORMATTING section.
 
 The reverse of B<--ignore-ood>.
 
-=item B<--nossl>
-
-Avoid usage of secure http connections to the AUR.
-
 =item B<-o, --ignore-ood>
 
 Ignore all results marked as out of date.
