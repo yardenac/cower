@@ -111,6 +111,12 @@ The reverse of B<--ignore-ood>.
 
 Ignore all results marked as out of date.
 
+=item B<-p, --from-pkgbuild>
+
+Interpret non-option arguments to cower as paths to PKGBUILDs which will be
+parsed for depends and makedepends. These dependencies will then be re-used
+as package targets for cower.
+
 =item B<-q, --quiet>
 
 Output less.

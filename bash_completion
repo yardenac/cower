@@ -10,8 +10,8 @@ _cower() {
 
   opts="-d --download -i --info -m --msearch -s --search -u --update -c --color
         -f --force --format -h --help --ignore -o --ignore-ood --no-ignore-ood
-        --ignorerepo --listdelim -q --quiet -t --target --threads --debug
-        -v --verbose"
+        --ignorerepo --listdelim -p --from-pkgbuild -q --quiet -t --target
+        --threads --debug -v --verbose"
 
   n=${#COMP_WORDS[@]}
 

@@ -284,6 +284,7 @@ static int json_integer(void *ctx, long long);
 static int json_map_key(void*, const unsigned char*, size_t);
 static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
+static alpm_list_t *load_targets_from_files(alpm_list_t *files);
 static void openssl_crypto_cleanup(void);
 static void openssl_crypto_init(void);
 static unsigned long openssl_thread_id(void) __attribute__ ((const));
@@ -330,6 +331,7 @@ static struct {
 	int getdeps:1;
 	int quiet:1;
 	int skiprepos:1;
+	int frompkgbuild:1;
 	int maxthreads;
 	long timeout;
 
@@ -883,7 +885,8 @@ char *get_file_as_buffer(const char *path) /* {{{ */
 
 	fp = fopen(path, "r");
 	if(!fp) {
-		cwr_fprintf(stderr, LOG_ERROR, "fopen: %s\n", strerror(errno));
+		cwr_fprintf(stderr, LOG_ERROR, "error: failed to open %s: %s\n",
+				path, strerror(errno));
 		return NULL;
 	}
 
@@ -1110,6 +1113,37 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	}
 
 	return 1;
+} /* }}} */
+
+alpm_list_t *load_targets_from_files(alpm_list_t *files) /* {{{ */
+{
+	alpm_list_t *i, *targets = NULL, *results = NULL;
+
+	for(i = files; i; i = i->next) {
+		alpm_list_t *depends = NULL;
+		char *pkgbuild = get_file_as_buffer(i->data);
+
+		alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
+			&depends, &depends, NULL, NULL, NULL
+		};
+
+		pkgbuild_get_extinfo(pkgbuild, pkg_details);
+		free(pkgbuild);
+
+		results = alpm_list_join(results, depends);
+	}
+
+	/* sanitize and dedupe */
+	for(i = results; i; i = i->next) {
+		char *sanitized = strdup(i->data);
+
+		sanitized[strcspn(sanitized, "<>=")] = '\0';
+		if(!alpm_list_find_str(targets, sanitized)) {
+			targets = alpm_list_add(targets, sanitized);
+		}
+	}
+
+	return targets;
 } /* }}} */
 
 void openssl_crypto_cleanup(void) /* {{{ */
@@ -1359,6 +1393,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 		{"debug",         no_argument,        0, OP_DEBUG},
 		{"force",         no_argument,        0, 'f'},
 		{"format",        required_argument,  0, OP_FORMAT},
+		{"from-pkgbuild", no_argument,        0, 'p'},
 		{"help",          no_argument,        0, 'h'},
 		{"ignore",        required_argument,  0, OP_IGNOREPKG},
 		{"ignore-ood",    no_argument,        0, 'o'},
@@ -1374,7 +1409,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 		{0, 0, 0, 0}
 	};
 
-	while((opt = getopt_long(argc, argv, "bc::dfhimoqst:uvV", opts, &option_index)) != -1) {
+	while((opt = getopt_long(argc, argv, "bc::dfhimopqst:uvV", opts, &option_index)) != -1) {
 		char *token;
 
 		switch(opt) {
@@ -1449,6 +1484,9 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				break;
 			case 'o':
 				cfg.ignoreood = 1;
+				break;
+			case 'p':
+				cfg.frompkgbuild |= 1;
 				break;
 			case OP_IGNOREPKG:
 				for(token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
@@ -2411,7 +2449,10 @@ int main(int argc, char *argv[]) {
 		goto finish;
 	}
 
-	if(alpm_list_find_str(cfg.targets, "-")) {
+	if(cfg.frompkgbuild) {
+		/* treat arguments as filenames to load/extract */
+		cfg.targets = load_targets_from_files(cfg.targets);
+	} else if(alpm_list_find_str(cfg.targets, "-")) {
 		char *vdata;
 		cfg.targets = alpm_list_remove_str(cfg.targets, "-", &vdata);
 		free(vdata);
