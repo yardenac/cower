@@ -1073,25 +1073,20 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 		return 1;
 	}
 
-#define VALDUPE(dest, src, n) \
-	dest = malloc(n + 1); \
-	memcpy(dest, src, n); \
-	dest[n] = '\0';
-
 	if(KEY_IS(NAME)) {
-		VALDUPE(p->aurpkg->name, data, size);
+		p->aurpkg->name = strndup((const char*)data, size);
 	} else if(KEY_IS(PKG_MAINT)) {
-		VALDUPE(p->aurpkg->maint, data, size);
+		p->aurpkg->maint = strndup((const char*)data, size);
 	} else if(KEY_IS(VERSION)) {
-		VALDUPE(p->aurpkg->ver, data, size);
+		p->aurpkg->ver = strndup((const char*)data, size);
 	} else if(KEY_IS(AUR_DESC)) {
-		VALDUPE(p->aurpkg->desc, data, size);
+		p->aurpkg->desc = strndup((const char*)data, size);
 	} else if(KEY_IS(URL)) {
-		VALDUPE(p->aurpkg->url, data, size);
+		p->aurpkg->url = strndup((const char*)data, size);
 	} else if(KEY_IS(URLPATH)) {
-		VALDUPE(p->aurpkg->urlpath, data, size);
+		p->aurpkg->urlpath = strndup((const char*)data, size);
 	} else if(KEY_IS(AUR_LICENSE)) {
-		VALDUPE(p->aurpkg->lic, data, size);
+		p->aurpkg->lic = strndup((const char*)data, size);
 	}
 
 	return 1;
