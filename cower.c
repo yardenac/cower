@@ -1067,7 +1067,6 @@ int json_start_map(void *ctx) /* {{{ */
 int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
 	struct yajl_parser_t *p = ctx;
-	char buffer[32];
 
 	if(KEY_IS(AUR_QUERY_TYPE) &&
 			STR_STARTS_WITH((const char*)data, AUR_QUERY_ERROR)) {
@@ -1079,21 +1078,12 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	memcpy(dest, src, n); \
 	dest[n] = '\0';
 
-#define NUMCOPY(dest, src, n) \
-	memcpy(buffer, src, n); \
-	buffer[n] = '\0'; \
-	dest = strtol(buffer, NULL, 10);
-
-	if(KEY_IS(AUR_ID)) {
-		NUMCOPY(p->aurpkg->id, data, size);
-	} else if(KEY_IS(NAME)) {
+	if(KEY_IS(NAME)) {
 		VALDUPE(p->aurpkg->name, data, size);
 	} else if(KEY_IS(PKG_MAINT)) {
 		VALDUPE(p->aurpkg->maint, data, size);
 	} else if(KEY_IS(VERSION)) {
 		VALDUPE(p->aurpkg->ver, data, size);
-	} else if(KEY_IS(AUR_CAT)) {
-		NUMCOPY(p->aurpkg->cat, data, size);
 	} else if(KEY_IS(AUR_DESC)) {
 		VALDUPE(p->aurpkg->desc, data, size);
 	} else if(KEY_IS(URL)) {
@@ -1102,14 +1092,6 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 		VALDUPE(p->aurpkg->urlpath, data, size);
 	} else if(KEY_IS(AUR_LICENSE)) {
 		VALDUPE(p->aurpkg->lic, data, size);
-	} else if(KEY_IS(AUR_VOTES)) {
-		NUMCOPY(p->aurpkg->votes, data, size);
-	} else if(KEY_IS(AUR_OOD)) {
-		p->aurpkg->ood = *data - 48;
-	} else if(KEY_IS(AUR_FIRSTSUB)) {
-		NUMCOPY(p->aurpkg->firstsub, data, size);
-	} else if(KEY_IS(AUR_LASTMOD)) {
-		NUMCOPY(p->aurpkg->lastmod, data, size);
 	}
 
 	return 1;
