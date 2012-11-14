@@ -73,7 +73,7 @@
 #define COWER_USERAGENT       "cower/3.x"
 
 #define AUR_BASE_URL          "https://aur.archlinux.org%s"
-#define AUR_PKG_URL_FORMAT    "https://aur.archlinux.org/packages.php?ID="
+#define AUR_PKG_URL_FORMAT    "https://aur.archlinux.org/packages/"
 #define AUR_RPC_URL           "https://aur.archlinux.org/rpc.php?type=%s&arg=%s"
 #define THREAD_DEFAULT        10
 #define TIMEOUT_DEFAULT       10L
@@ -1719,7 +1719,7 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 					printf(fmt, buf);
 					break;
 				case 'p':
-					snprintf(buf, 64, AUR_PKG_URL_FORMAT "%d", pkg->id);
+					snprintf(buf, 64, AUR_PKG_URL_FORMAT "%s", pkg->name);
 					printf(fmt, buf);
 					break;
 				case 's':
@@ -1799,8 +1799,8 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	printf(VERSION "        : %s%s%s\n",
 			pkg->ood ? colstr->ood : colstr->utd, pkg->ver, colstr->nc);
 	printf(URL "            : %s%s%s\n", colstr->url, pkg->url, colstr->nc);
-	printf(PKG_AURPAGE "       : %s" AUR_PKG_URL_FORMAT "%d%s\n",
-			colstr->url, pkg->id, colstr->nc);
+	printf(PKG_AURPAGE "       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
+			colstr->url, pkg->name, colstr->nc);
 
 	print_extinfo_list(pkg->depends, PKG_DEPENDS, LIST_DELIM, 1);
 	print_extinfo_list(pkg->makedepends, PKG_MAKEDEPENDS, LIST_DELIM, 1);
