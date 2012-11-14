@@ -1067,6 +1067,7 @@ int json_start_map(void *ctx) /* {{{ */
 int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
 	struct yajl_parser_t *p = ctx;
+	char **key = NULL;
 
 	if(KEY_IS(AUR_QUERY_TYPE) &&
 			STR_STARTS_WITH((const char*)data, AUR_QUERY_ERROR)) {
@@ -1074,19 +1075,27 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	}
 
 	if(KEY_IS(NAME)) {
-		p->aurpkg->name = strndup((const char*)data, size);
+		key = &p->aurpkg->name;
 	} else if(KEY_IS(PKG_MAINT)) {
-		p->aurpkg->maint = strndup((const char*)data, size);
+		key = &p->aurpkg->maint;
 	} else if(KEY_IS(VERSION)) {
-		p->aurpkg->ver = strndup((const char*)data, size);
+		key = &p->aurpkg->ver;
 	} else if(KEY_IS(AUR_DESC)) {
-		p->aurpkg->desc = strndup((const char*)data, size);
+		key = &p->aurpkg->desc;
 	} else if(KEY_IS(URL)) {
-		p->aurpkg->url = strndup((const char*)data, size);
+		key = &p->aurpkg->url;
 	} else if(KEY_IS(URLPATH)) {
-		p->aurpkg->urlpath = strndup((const char*)data, size);
+		key = &p->aurpkg->urlpath;
 	} else if(KEY_IS(AUR_LICENSE)) {
-		p->aurpkg->lic = strndup((const char*)data, size);
+		key = &p->aurpkg->lic;
+	} else {
+		return 1;
+	}
+
+	*key = strndup((const char*)data, size);
+	if(*key == NULL) {
+		cwr_fprintf(stderr, LOG_ERROR, "failed to allocate string: %s\n",
+				strerror(errno));
 	}
 
 	return 1;
