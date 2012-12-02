@@ -714,7 +714,7 @@ size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream) /
 {
 	void *newdata;
 	size_t realsize = size * nmemb;
-	struct response_t *mem = (struct response_t*)stream;
+	struct response_t *mem = stream;
 
 	newdata = realloc(mem->data, mem->size + realsize + 1);
 	if(newdata) {
