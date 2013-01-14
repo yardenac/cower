@@ -84,6 +84,7 @@
 #define AUR_QUERY_TYPE_SEARCH "search"
 #define AUR_QUERY_TYPE_MSRCH  "msearch"
 #define AUR_QUERY_ERROR       "error"
+#define AUR_QUERY_RESULTS     "results"
 #define AUR_QUERY_RESULTCOUNT "resultcount"
 
 #define NAME                  "Name"
@@ -238,6 +239,7 @@ struct yajl_parser_t {
 	char key[32];
 	size_t keysz;
 	int json_depth;
+	char *error;
 };
 
 struct response_t {
@@ -1072,6 +1074,9 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	if(KEY_IS(AUR_QUERY_TYPE) &&
 			STR_STARTS_WITH((const char*)data, AUR_QUERY_ERROR)) {
 		return 1;
+	} else if(KEY_IS(AUR_QUERY_RESULTS)) {
+		p->error = strndup((const char*)data, size);
+		return 0;
 	}
 
 	if(KEY_IS(NAME)) {
@@ -2145,6 +2150,11 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 	}
 
 	yajl_complete_parse(yajl_hand);
+	if(parse_struct->error) {
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: query failed: %s\n",
+				(const char*)arg, parse_struct->error);
+		goto finish;
+	}
 
 	pkglist = parse_struct->pkglist;
 
@@ -2174,6 +2184,7 @@ finish:
 	yajl_free(yajl_hand);
 	curl_free(escaped);
 	FREE(parse_struct->aurpkg);
+	FREE(parse_struct->error);
 	FREE(parse_struct);
 	FREE(url);
 
