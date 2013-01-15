@@ -553,9 +553,7 @@ struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
 	struct aurpkg_t *newpkg;
 
 	MALLOC(newpkg, sizeof(struct aurpkg_t), return NULL);
-	memcpy(newpkg, pkg, sizeof(struct aurpkg_t));
-
-	return newpkg;
+	return memcpy(newpkg, pkg, sizeof(struct aurpkg_t));
 } /* }}} */
 
 void aurpkg_free(void *pkg) /* {{{ */
@@ -2442,10 +2440,6 @@ int main(int argc, char *argv[]) {
 		return ret;
 	}
 
-	if((ret = set_working_dir()) != 0) {
-		goto finish;
-	}
-
 	if(cfg.frompkgbuild) {
 		/* treat arguments as filenames to load/extract */
 		cfg.targets = load_targets_from_files(cfg.targets);
@@ -2461,6 +2455,11 @@ int main(int argc, char *argv[]) {
 		if(!freopen(ctermid(NULL), "r", stdin)) {
 			cwr_printf(LOG_DEBUG, "failed to reopen stdin for reading\n");
 		}
+	}
+
+	ret = set_working_dir();
+	if(ret != 0) {
+		goto finish;
 	}
 
 	cwr_printf(LOG_DEBUG, "initializing curl\n");
