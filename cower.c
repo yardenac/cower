@@ -497,7 +497,7 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 	int want_subdir = subdir != NULL, ok, ret = 0;
 
 	archive = archive_read_new();
-	archive_read_support_compression_all(archive);
+	archive_read_support_filter_all(archive);
 	archive_read_support_format_all(archive);
 
 	want_subdir = (subdir != NULL);
