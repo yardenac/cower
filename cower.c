@@ -2439,7 +2439,6 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) { /* {{{ */
 int main(int argc, char *argv[]) {
 	alpm_list_t *results = NULL, *thread_return = NULL;
 	int ret, n, num_threads;
-	pthread_attr_t attr;
 	pthread_t *threads;
 	struct task_t task = {
 		.printfn = NULL,
@@ -2532,9 +2531,6 @@ int main(int argc, char *argv[]) {
 
 	CALLOC(threads, num_threads, sizeof(pthread_t), goto finish);
 
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
 	/* override task behavior */
 	if(cfg.opmask & OP_UPDATE) {
 		task.threadfn = task_update;
@@ -2550,7 +2546,7 @@ int main(int argc, char *argv[]) {
 	alpm_db_get_pkgcache(db_local);
 
 	for(n = 0; n < num_threads; n++) {
-		ret = pthread_create(&threads[n], &attr, thread_pool, &task);
+		ret = pthread_create(&threads[n], NULL, thread_pool, &task);
 		if(ret != 0) {
 			cwr_fprintf(stderr, LOG_ERROR, "failed to spawn new thread: %s\n",
 					strerror(ret));
@@ -2562,9 +2558,7 @@ int main(int argc, char *argv[]) {
 		pthread_join(threads[n], (void**)&thread_return);
 		results = alpm_list_join(results, thread_return);
 	}
-
 	free(threads);
-	pthread_attr_destroy(&attr);
 
 	/* we need to exit with a non-zero value when:
 	 * a) search/info/download returns nothing
