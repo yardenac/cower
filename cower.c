@@ -69,18 +69,9 @@
 	#define PACMAN_CONFIG       "/etc/pacman.conf"
 #endif
 
-#define COWER_USERAGENT       "cower/" COWER_VERSION
-
-#define AUR_BASE_URL          "https://aur.archlinux.org%s"
-#define AUR_PKG_URL_FORMAT    "https://aur.archlinux.org/packages/"
-#define AUR_RPC_URL           "https://aur.archlinux.org/rpc.php?type=%s&arg=%s"
-
-#define PKGBUILD_DEPENDS      "depends=("
-#define PKGBUILD_MAKEDEPENDS  "makedepends=("
-#define PKGBUILD_OPTDEPENDS   "optdepends=("
-#define PKGBUILD_PROVIDES     "provides=("
-#define PKGBUILD_CONFLICTS    "conflicts=("
-#define PKGBUILD_REPLACES     "replaces=("
+#define AUR_BASE_URL          "https://aur.archlinux.org"
+#define AUR_PKG_URL_FORMAT    AUR_BASE_URL "/packages/"
+#define AUR_RPC_URL           AUR_BASE_URL "/rpc.php?type=%s&arg=%s"
 
 #define NC                    "\033[0m"
 #define BOLD                  "\033[1m"
@@ -333,8 +324,11 @@ static const int kUnset = -1;
 static const int kThreadDefault = 10;
 static const int kInfoIndent = 17;
 static const int kSearchIndent = 4;
-static const char kListDelim[] = "  ";
+static const int kRegexOpts = REG_ICASE|REG_EXTENDED|REG_NOSUB|REG_NEWLINE;
 static const long kTimeoutDefault = 10;
+static const char kListDelim[] = "  ";
+static const char kCowerUserAgent[] = "cower/" COWER_VERSION;
+static const char kRegexChars[] = "^.+*?$[](){}|\\";
 
 static yajl_callbacks callbacks = {
 	NULL,             /* null */
@@ -671,7 +665,7 @@ CURL *curl_init_easy_handle(CURL *handle) /* {{{ */
 	}
 
 	curl_easy_reset(handle);
-	curl_easy_setopt(handle, CURLOPT_USERAGENT, COWER_USERAGENT);
+	curl_easy_setopt(handle, CURLOPT_USERAGENT, kCowerUserAgent);
 	curl_easy_setopt(handle, CURLOPT_ENCODING, "deflate, gzip");
 	curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, cfg.timeout);
 	curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
@@ -769,7 +763,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 
 	result = queryresult->data;
 	escaped = url_escape(result->urlpath, 0, "/");
-	cwr_asprintf(&url, AUR_BASE_URL, escaped);
+	cwr_asprintf(&url, AUR_BASE_URL "%s", escaped);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	free(escaped);
 
@@ -833,7 +827,7 @@ alpm_list_t *filter_results(alpm_list_t *list) /* {{{ */
 		const char *targ = i->data;
 		filterlist = NULL;
 
-		if(regcomp(&regex, targ, REGEX_OPTS) == 0) {
+		if(regcomp(&regex, targ, kRegexOpts) == 0) {
 			for(j = list; j; j = alpm_list_next(j)) {
 				struct aurpkg_t *pkg = j->data;
 				const char *name = pkg->name;
@@ -1601,18 +1595,18 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) /* {{{ */
 			continue;
 		}
 
-		if(STR_STARTS_WITH(lineptr, PKGBUILD_DEPENDS)) {
+		if(STR_STARTS_WITH(lineptr, "depends=(")) {
 			deplist = details[PKGDETAIL_DEPENDS];
-		} else if(STR_STARTS_WITH(lineptr, PKGBUILD_MAKEDEPENDS)) {
+		} else if(STR_STARTS_WITH(lineptr, "makedepends=(")) {
 			deplist = details[PKGDETAIL_MAKEDEPENDS];
-		} else if(STR_STARTS_WITH(lineptr, PKGBUILD_OPTDEPENDS)) {
+		} else if(STR_STARTS_WITH(lineptr, "optdepends=(")) {
 			deplist = details[PKGDETAIL_OPTDEPENDS];
 			type = PKGDETAIL_OPTDEPENDS;
-		} else if(STR_STARTS_WITH(lineptr, PKGBUILD_PROVIDES)) {
+		} else if(STR_STARTS_WITH(lineptr, "provides=(")) {
 			deplist = details[PKGDETAIL_PROVIDES];
-		} else if(STR_STARTS_WITH(lineptr, PKGBUILD_REPLACES)) {
+		} else if(STR_STARTS_WITH(lineptr, "replaces=(")) {
 			deplist = details[PKGDETAIL_REPLACES];
-		} else if(STR_STARTS_WITH(lineptr, PKGBUILD_CONFLICTS)) {
+		} else if(STR_STARTS_WITH(lineptr, "conflicts=(")) {
 			deplist = details[PKGDETAIL_CONFLICTS];
 		} else {
 			continue;
@@ -2127,7 +2121,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 	/* find a valid chunk of search string */
 	if(cfg.opmask & OP_SEARCH) {
 		for(argstr = arg; *argstr; argstr++) {
-			span = strcspn(argstr, REGEX_CHARS);
+			span = strcspn(argstr, kRegexChars);
 
 			/* given 'cow?', we can't include w in the search */
 			if(argstr[span] == '?' || argstr[span] == '*') {
@@ -2207,7 +2201,7 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 
 		aurpkg = pkglist->data;
 		escaped = url_escape(aurpkg->urlpath, 0, "/");
-		cwr_asprintf(&pburl, AUR_BASE_URL, escaped);
+		cwr_asprintf(&pburl, AUR_BASE_URL "%s", escaped);
 		memcpy(strrchr(pburl, '/') + 1, "PKGBUILD\0", 9);
 
 		pkgbuild = curl_get_url_as_buffer(curl, pburl);
