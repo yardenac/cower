@@ -1076,7 +1076,7 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 
 	switch(p->key) {
 	case KEY_QUERY_RESULTS:
-		/* usually the AUR returns this as an integer. when it shows
+		/* usually the AUR returns this as an array. when it shows
 		 * up as a string, it means we have an error. gross. */
 		p->error = strndup((const char*)data, size);
 		return 0;
@@ -1102,6 +1102,7 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 		key = &p->aurpkg->lic;
 		break;
 	default:
+		/* ignored other fields */
 		return 1;
 	}
 
