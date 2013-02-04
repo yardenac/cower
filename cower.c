@@ -2464,8 +2464,8 @@ int main(int argc, char *argv[]) {
 			return ret;
 	}
 
-	if((ret = parse_configfile() != 0)) {
-		return ret;
+	if(parse_configfile() != 0) {
+		return 1;
 	}
 
 	/* fallback from sentinel values */
@@ -2474,8 +2474,8 @@ int main(int argc, char *argv[]) {
 	cfg.color = cfg.color == kUnset ? 0 : cfg.color;
 	cfg.ignoreood = cfg.ignoreood == kUnset ? 0 : cfg.ignoreood;
 
-	if((ret = strings_init()) != 0) {
-		return ret;
+	if(strings_init() != 0) {
+		return 1;
 	}
 
 	if(cfg.frompkgbuild) {
