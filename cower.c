@@ -74,9 +74,6 @@
 #define AUR_BASE_URL          "https://aur.archlinux.org%s"
 #define AUR_PKG_URL_FORMAT    "https://aur.archlinux.org/packages/"
 #define AUR_RPC_URL           "https://aur.archlinux.org/rpc.php?type=%s&arg=%s"
-#define THREAD_DEFAULT        10
-#define TIMEOUT_DEFAULT       10L
-#define UNSET                 -1
 
 #define PKGBUILD_DEPENDS      "depends=("
 #define PKGBUILD_MAKEDEPENDS  "makedepends=("
@@ -84,10 +81,6 @@
 #define PKGBUILD_PROVIDES     "provides=("
 #define PKGBUILD_CONFLICTS    "conflicts=("
 #define PKGBUILD_REPLACES     "replaces=("
-
-#define INFO_INDENT           17
-#define SRCH_INDENT           4
-#define LIST_DELIM            "  "
 
 #define NC                    "\033[0m"
 #define BOLD                  "\033[1m"
@@ -335,6 +328,13 @@ alpm_db_t *db_local;
 alpm_list_t *workq;
 struct openssl_mutex_t openssl_lock;
 static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
+
+static const int kUnset = -1;
+static const int kThreadDefault = 10;
+static const int kInfoIndent = 17;
+static const int kSearchIndent = 4;
+static const char kListDelim[] = "  ";
+static const long kTimeoutDefault = 10;
 
 static yajl_callbacks callbacks = {
 	NULL,             /* null */
@@ -1326,7 +1326,7 @@ int parse_configfile(void) /* {{{ */
 				cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
 			}
 		} else if(STREQ(key, "IgnoreOOD")) {
-			if(cfg.ignoreood == UNSET) {
+			if(cfg.ignoreood == kUnset) {
 				cfg.ignoreood = 1;
 			}
 		} else if(STREQ(key, "TargetDir")) {
@@ -1348,7 +1348,7 @@ int parse_configfile(void) /* {{{ */
 				}
 			}
 		} else if(STREQ(key, "MaxThreads")) {
-			if(val && cfg.maxthreads == UNSET) {
+			if(val && cfg.maxthreads == kUnset) {
 				cfg.maxthreads = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.maxthreads <= 0) {
 					fprintf(stderr, "error: invalid option to MaxThreads: %s\n", val);
@@ -1356,7 +1356,7 @@ int parse_configfile(void) /* {{{ */
 				}
 			}
 		} else if(STREQ(key, "ConnectTimeout")) {
-			if(val && cfg.timeout == UNSET) {
+			if(val && cfg.timeout == kUnset) {
 				cfg.timeout = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.timeout < 0) {
 					fprintf(stderr, "error: invalid option to ConnectTimeout: %s\n", val);
@@ -1364,7 +1364,7 @@ int parse_configfile(void) /* {{{ */
 				}
 			}
 		} else if(STREQ(key, "Color")) {
-			if(cfg.color == UNSET) {
+			if(cfg.color == kUnset) {
 				if(!val || STREQ(val, "auto")) {
 					if(isatty(fileno(stdout))) {
 						cfg.color = 1;
@@ -1695,15 +1695,15 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 	cols = wrap ? getcols() : 0;
 
 	if(fieldname) {
-		count += printf("%-*s: ", INFO_INDENT - 2, fieldname);
+		count += printf("%-*s: ", kInfoIndent - 2, fieldname);
 	}
 
 	for(i = list; i; i = next) {
 		size_t data_len = strlen(i->data);
 		next = alpm_list_next(i);
 		if(wrap && cols > 0 && count + data_len >= cols) {
-			printf("%-*c", INFO_INDENT + 1, '\n');
-			count = INFO_INDENT;
+			printf("%-*c", kInfoIndent + 1, '\n');
+			count = kInfoIndent;
 		}
 		count += data_len;
 		fputs(i->data, stdout);
@@ -1843,20 +1843,20 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	printf("AUR Page       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
 			colstr->url, pkg->name, colstr->nc);
 
-	print_extinfo_list(pkg->depends, "Depends On", LIST_DELIM, 1);
-	print_extinfo_list(pkg->makedepends, "Makdepends", LIST_DELIM, 1);
-	print_extinfo_list(pkg->provides, "Provides", LIST_DELIM, 1);
-	print_extinfo_list(pkg->conflicts, "Conflicts With", LIST_DELIM, 1);
+	print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
+	print_extinfo_list(pkg->makedepends, "Makdepends", kListDelim, 1);
+	print_extinfo_list(pkg->provides, "Provides", kListDelim, 1);
+	print_extinfo_list(pkg->conflicts, "Conflicts With", kListDelim, 1);
 
 	if(pkg->optdepends) {
 		const alpm_list_t *i;
 		printf("Optional Deps  : %s\n", (const char*)pkg->optdepends->data);
 		for(i = pkg->optdepends->next; i; i = alpm_list_next(i)) {
-			printf("%-*s%s\n", INFO_INDENT, "", (const char*)i->data);
+			printf("%-*s%s\n", kInfoIndent, "", (const char*)i->data);
 		}
 	}
 
-	print_extinfo_list(pkg->replaces, "Replaces", LIST_DELIM, 1);
+	print_extinfo_list(pkg->replaces, "Replaces", kListDelim, 1);
 
 	printf("Category       : %s\n"
 				 "License        : %s\n"
@@ -1877,7 +1877,7 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	printf("Last Modified  : %s\n", datestring);
 
 	printf("Description    : ");
-	indentprint(pkg->desc, INFO_INDENT);
+	indentprint(pkg->desc, kInfoIndent);
 	printf("\n\n");
 } /* }}} */
 
@@ -1900,7 +1900,7 @@ void print_pkg_search(struct aurpkg_t *pkg) /* {{{ */
 			printf(" %s[%sinstalled%s]%s", colstr->url, instcolor, colstr->url, colstr->nc);
 		}
 		printf("\n    ");
-		indentprint(pkg->desc, SRCH_INDENT);
+		indentprint(pkg->desc, kSearchIndent);
 		fputc('\n', stdout);
 	}
 } /* }}} */
@@ -2053,9 +2053,9 @@ int strings_init(void) /* {{{ */
 		colstr->nc = "";
 	}
 
-	/* guard against delim being something other than LIST_DELIM if extinfo
+	/* guard against delim being something other than kListDelim if extinfo
 	 * and format aren't provided */
-	cfg.delim = (cfg.extinfo && cfg.format) ? cfg.delim : LIST_DELIM;
+	cfg.delim = (cfg.extinfo && cfg.format) ? cfg.delim : kListDelim;
 
 	return 0;
 } /* }}} */
@@ -2455,10 +2455,10 @@ int main(int argc, char *argv[]) {
 	setlocale(LC_ALL, "");
 
 	/* initialize config */
-	cfg.color = cfg.maxthreads = cfg.timeout = UNSET;
-	cfg.delim = LIST_DELIM;
+	cfg.color = cfg.maxthreads = cfg.timeout = kUnset;
+	cfg.delim = kListDelim;
 	cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
-	cfg.ignoreood = UNSET;
+	cfg.ignoreood = kUnset;
 
 	ret = parse_options(argc, argv);
 	switch(ret) {
@@ -2476,10 +2476,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* fallback from sentinel values */
-	cfg.maxthreads = cfg.maxthreads == UNSET ? THREAD_DEFAULT : cfg.maxthreads;
-	cfg.timeout = cfg.timeout == UNSET ? TIMEOUT_DEFAULT : cfg.timeout;
-	cfg.color = cfg.color == UNSET ? 0 : cfg.color;
-	cfg.ignoreood = cfg.ignoreood == UNSET ? 0 : cfg.ignoreood;
+	cfg.maxthreads = cfg.maxthreads == kUnset ? kThreadDefault : cfg.maxthreads;
+	cfg.timeout = cfg.timeout == kUnset ? kTimeoutDefault : cfg.timeout;
+	cfg.color = cfg.color == kUnset ? 0 : cfg.color;
+	cfg.ignoreood = cfg.ignoreood == kUnset ? 0 : cfg.ignoreood;
 
 	if((ret = strings_init()) != 0) {
 		return ret;
