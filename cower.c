@@ -58,7 +58,6 @@
 #define STREQ(x,y)            (strcmp((x),(y)) == 0)
 #define STR_STARTS_WITH(x,y)  (strncmp((x),(y), strlen(y)) == 0)
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
-#define KEY_IS(k)             (strncmp(p->key, (k), p->keysz) == 0)
 
 #ifndef PACMAN_ROOT
 	#define PACMAN_ROOT         "/"
@@ -79,27 +78,14 @@
 #define TIMEOUT_DEFAULT       10L
 #define UNSET                 -1
 
-#define AUR_QUERY_TYPE        "type"
 #define AUR_QUERY_TYPE_INFO   "info"
 #define AUR_QUERY_TYPE_SEARCH "search"
 #define AUR_QUERY_TYPE_MSRCH  "msearch"
 #define AUR_QUERY_ERROR       "error"
-#define AUR_QUERY_RESULTS     "results"
-#define AUR_QUERY_RESULTCOUNT "resultcount"
 
 #define NAME                  "Name"
 #define VERSION               "Version"
 #define URL                   "URL"
-#define URLPATH               "URLPath"
-
-#define AUR_ID                "ID"
-#define AUR_CAT               "CategoryID"
-#define AUR_DESC              "Description"
-#define AUR_LICENSE           "License"
-#define AUR_VOTES             "NumVotes"
-#define AUR_OOD               "OutOfDate"
-#define AUR_FIRSTSUB          "FirstSubmitted"
-#define AUR_LASTMOD           "LastModified"
 
 #define PKGBUILD_DEPENDS      "depends=("
 #define PKGBUILD_MAKEDEPENDS  "makedepends=("
@@ -188,6 +174,25 @@ enum {
 	OP_NOIGNOREOOD
 };
 
+enum {
+	KEY_CATEGORY,
+	KEY_DESCRIPTION,
+	KEY_FIRSTSUB,
+	KEY_ID,
+	KEY_LASTMOD,
+	KEY_LICENSE,
+	KEY_MAINTAINER,
+	KEY_NAME,
+	KEY_VOTES,
+	KEY_OOD,
+	KEY_URL,
+	KEY_URLPATH,
+	KEY_VERSION,
+	KEY_QUERY_RESULTCOUNT,
+	KEY_QUERY_RESULTS,
+	KEY_QUERY_TYPE,
+};
+
 typedef enum __pkgdetail_t {
 	PKGDETAIL_DEPENDS = 0,
 	PKGDETAIL_MAKEDEPENDS,
@@ -197,6 +202,11 @@ typedef enum __pkgdetail_t {
 	PKGDETAIL_REPLACES,
 	PKGDETAIL_MAX
 } pkgdetail_t;
+
+struct key_t {
+	int id;
+	const char *name;
+};
 
 struct strings_t {
 	const char *error;
@@ -236,8 +246,7 @@ struct yajl_parser_t {
 	alpm_list_t *pkglist;
 	int resultcount;
 	struct aurpkg_t *aurpkg;
-	char key[32];
-	size_t keysz;
+	int key;
 	int json_depth;
 	char *error;
 };
@@ -286,6 +295,7 @@ static int json_integer(void *ctx, long long);
 static int json_map_key(void*, const unsigned char*, size_t);
 static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
+static int keycmp(const void *v1, const void *v2);
 static alpm_list_t *load_targets_from_files(alpm_list_t *files);
 static void openssl_crypto_cleanup(void);
 static void openssl_crypto_init(void);
@@ -306,6 +316,7 @@ static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static int resolve_dependencies(CURL*, const char*, const char*);
 static int set_working_dir(void);
 static int strings_init(void);
+static int string_to_key(const unsigned char *key, size_t len);
 static size_t strtrim(char*);
 static void *task_download(CURL*, void*);
 static void *task_query(CURL*, void*);
@@ -373,6 +384,26 @@ static const char *aur_cat[] = { NULL, "None", "daemons", "devel", "editors",
                                 "emulators", "games", "gnome", "i18n", "kde", "lib",
                                 "modules", "multimedia", "network", "office",
                                 "science", "system", "x11", "xfce", "kernels" };
+
+static const struct key_t json_keys[] = {
+	{ KEY_CATEGORY, "CategoryID" },
+	{ KEY_DESCRIPTION, "Description" },
+	{ KEY_FIRSTSUB, "FirstSubmitted" },
+	{ KEY_ID, "ID" },
+	{ KEY_LASTMOD, "LastModified" },
+	{ KEY_LICENSE, "License" },
+	{ KEY_MAINTAINER, "Maintainer" },
+	{ KEY_NAME, "Name" },
+	{ KEY_VOTES, "NumVotes" },
+	{ KEY_OOD, "OutOfDate" },
+	{ KEY_URL, "URL" },
+	{ KEY_URLPATH, "URLPath" },
+	{ KEY_VERSION, "Version" },
+	{ KEY_QUERY_RESULTCOUNT, "resultcount" },
+	{ KEY_QUERY_RESULTS, "results" },
+	{ KEY_QUERY_TYPE, "type" },
+};
+
 /* }}} */
 
 alpm_handle_t *alpm_init(void) /* {{{ */
@@ -1022,20 +1053,31 @@ int json_integer(void *ctx, long long val) /* {{{ */
 {
 	struct yajl_parser_t *p = ctx;
 
-	if(KEY_IS(AUR_ID)) {
+	switch (p->key) {
+	case KEY_ID:
 		p->aurpkg->id = (int)val;
-	} else if(KEY_IS(AUR_CAT)) {
+		break;
+	case KEY_CATEGORY:
 		p->aurpkg->cat = (int)val;
-	} else if(KEY_IS(AUR_VOTES)) {
+		break;
+	case KEY_VOTES:
 		p->aurpkg->votes = (int)val;
-	} else if(KEY_IS(AUR_OOD)) {
+		break;
+	case KEY_OOD:
 		p->aurpkg->ood = (int)val;
-	} else if(KEY_IS(AUR_FIRSTSUB)) {
+		break;
+	case KEY_FIRSTSUB:
 		p->aurpkg->firstsub = (time_t)val;
-	} else if(KEY_IS(AUR_LASTMOD)) {
+		break;
+	case KEY_LASTMOD:
 		p->aurpkg->lastmod = (time_t)val;
-	} else if(KEY_IS(AUR_QUERY_RESULTCOUNT)) {
+		break;
+	case KEY_QUERY_RESULTCOUNT:
 		p->resultcount = (int)val;
+		break;
+	default:
+		/* ignore other keys */
+		break;
 	}
 
 	return 1;
@@ -1045,9 +1087,7 @@ int json_map_key(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 {
 	struct yajl_parser_t *p = ctx;
 
-	p->keysz = size;
-	memcpy(p->key, (const char*)data, size);
-	p->key[size] = '\0';
+	p->key = string_to_key(data, size);
 
 	return 1;
 } /* }}} */
@@ -1069,29 +1109,37 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	struct yajl_parser_t *p = ctx;
 	char **key = NULL;
 
-	if(KEY_IS(AUR_QUERY_TYPE) &&
-			STR_STARTS_WITH((const char*)data, AUR_QUERY_ERROR)) {
+	if(p->key == KEY_QUERY_TYPE &&
+			STR_STARTS_WITH((const char*)data, "error")) {
 		return 1;
-	} else if(KEY_IS(AUR_QUERY_RESULTS)) {
+	} else if(p->key == KEY_QUERY_RESULTS) {
 		p->error = strndup((const char*)data, size);
 		return 0;
 	}
 
-	if(KEY_IS(NAME)) {
+	switch(p->key) {
+	case KEY_NAME:
 		key = &p->aurpkg->name;
-	} else if(KEY_IS(PKG_MAINT)) {
+		break;
+	case KEY_MAINTAINER:
 		key = &p->aurpkg->maint;
-	} else if(KEY_IS(VERSION)) {
+		break;
+	case KEY_VERSION:
 		key = &p->aurpkg->ver;
-	} else if(KEY_IS(AUR_DESC)) {
+		break;
+	case KEY_DESCRIPTION:
 		key = &p->aurpkg->desc;
-	} else if(KEY_IS(URL)) {
+		break;
+	case KEY_URL:
 		key = &p->aurpkg->url;
-	} else if(KEY_IS(URLPATH)) {
+		break;
+	case KEY_URLPATH:
 		key = &p->aurpkg->urlpath;
-	} else if(KEY_IS(AUR_LICENSE)) {
+		break;
+	case KEY_LICENSE:
 		key = &p->aurpkg->lic;
-	} else {
+		break;
+	default:
 		return 1;
 	}
 
@@ -1102,6 +1150,14 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	}
 
 	return 1;
+} /* }}} */
+
+int keycmp(const void *v1, const void *v2)  /* {{{ */
+{
+	const struct key_t *k1 = v1;
+	const struct key_t *k2 = v2;
+
+	return strcmp(k1->name, k2->name);
 } /* }}} */
 
 alpm_list_t *load_targets_from_files(alpm_list_t *files) /* {{{ */
@@ -2029,6 +2085,22 @@ int strings_init(void) /* {{{ */
 	cfg.delim = (cfg.extinfo && cfg.format) ? cfg.delim : LIST_DELIM;
 
 	return 0;
+} /* }}} */
+
+int string_to_key(const unsigned char *key, size_t len) /* {{{ */
+{
+	char keybuf[32];
+	struct key_t k;
+	struct key_t *result;
+
+	snprintf(keybuf, len + 1, "%s", key);
+
+	k.name = keybuf;
+	result = bsearch(&k, json_keys, sizeof(json_keys) / sizeof(json_keys[0]),
+			sizeof(json_keys[0]), keycmp);
+
+	return result ? result->id : -1;
+
 } /* }}} */
 
 size_t strtrim(char *str) /* {{{ */
