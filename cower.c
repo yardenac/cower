@@ -69,7 +69,7 @@
 	#define PACMAN_CONFIG       "/etc/pacman.conf"
 #endif
 
-#define COWER_USERAGENT       "cower/3.x"
+#define COWER_USERAGENT       "cower/" COWER_VERSION
 
 #define AUR_BASE_URL          "https://aur.archlinux.org%s"
 #define AUR_PKG_URL_FORMAT    "https://aur.archlinux.org/packages/"
@@ -78,39 +78,12 @@
 #define TIMEOUT_DEFAULT       10L
 #define UNSET                 -1
 
-#define AUR_QUERY_TYPE_INFO   "info"
-#define AUR_QUERY_TYPE_SEARCH "search"
-#define AUR_QUERY_TYPE_MSRCH  "msearch"
-#define AUR_QUERY_ERROR       "error"
-
-#define NAME                  "Name"
-#define VERSION               "Version"
-#define URL                   "URL"
-
 #define PKGBUILD_DEPENDS      "depends=("
 #define PKGBUILD_MAKEDEPENDS  "makedepends=("
 #define PKGBUILD_OPTDEPENDS   "optdepends=("
 #define PKGBUILD_PROVIDES     "provides=("
 #define PKGBUILD_CONFLICTS    "conflicts=("
 #define PKGBUILD_REPLACES     "replaces=("
-
-#define PKG_REPO              "Repository"
-#define PKG_AURPAGE           "AUR Page"
-#define PKG_PROVIDES          "Provides"
-#define PKG_DEPENDS           "Depends On"
-#define PKG_MAKEDEPENDS       "Makedepends"
-#define PKG_OPTDEPENDS        "Optional Deps"
-#define PKG_CONFLICTS         "Conflicts With"
-#define PKG_REPLACES          "Replaces"
-#define PKG_CAT               "Category"
-#define PKG_NUMVOTES          "Votes"
-#define PKG_LICENSE           "License"
-#define PKG_OOD               "Out of Date"
-#define PKG_DESC              "Description"
-#define PKG_MAINT             "Maintainer"
-#define PKG_FIRSTSUB          "Submitted"
-#define PKG_LASTMOD           "Last Modified"
-#define PKG_TIMEFMT           "%c"
 
 #define INFO_INDENT           17
 #define SRCH_INDENT           4
@@ -1851,8 +1824,8 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	struct tm *ts;
 	alpm_pkg_t *ipkg;
 
-	printf(PKG_REPO "     : %saur%s\n", colstr->repo, colstr->nc);
-	printf(NAME "           : %s%s%s", colstr->pkg, pkg->name, colstr->nc);
+	printf("Repository     : %saur%s\n", colstr->repo, colstr->nc);
+	printf("Name           : %s%s%s", colstr->pkg, pkg->name, colstr->nc);
 	if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 		const char *instcolor;
 		if(alpm_pkg_vercmp(pkg->ver, alpm_pkg_get_version(ipkg)) > 0) {
@@ -1864,46 +1837,46 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	}
 	fputc('\n', stdout);
 
-	printf(VERSION "        : %s%s%s\n",
+	printf("Version        : %s%s%s\n",
 			pkg->ood ? colstr->ood : colstr->utd, pkg->ver, colstr->nc);
-	printf(URL "            : %s%s%s\n", colstr->url, pkg->url, colstr->nc);
-	printf(PKG_AURPAGE "       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
+	printf("URL            : %s%s%s\n", colstr->url, pkg->url, colstr->nc);
+	printf("AUR Page       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
 			colstr->url, pkg->name, colstr->nc);
 
-	print_extinfo_list(pkg->depends, PKG_DEPENDS, LIST_DELIM, 1);
-	print_extinfo_list(pkg->makedepends, PKG_MAKEDEPENDS, LIST_DELIM, 1);
-	print_extinfo_list(pkg->provides, PKG_PROVIDES, LIST_DELIM, 1);
-	print_extinfo_list(pkg->conflicts, PKG_CONFLICTS, LIST_DELIM, 1);
+	print_extinfo_list(pkg->depends, "Depends On", LIST_DELIM, 1);
+	print_extinfo_list(pkg->makedepends, "Makdepends", LIST_DELIM, 1);
+	print_extinfo_list(pkg->provides, "Provides", LIST_DELIM, 1);
+	print_extinfo_list(pkg->conflicts, "Conflicts With", LIST_DELIM, 1);
 
 	if(pkg->optdepends) {
 		const alpm_list_t *i;
-		printf(PKG_OPTDEPENDS "  : %s\n", (const char*)pkg->optdepends->data);
+		printf("Optional Deps  : %s\n", (const char*)pkg->optdepends->data);
 		for(i = pkg->optdepends->next; i; i = alpm_list_next(i)) {
 			printf("%-*s%s\n", INFO_INDENT, "", (const char*)i->data);
 		}
 	}
 
-	print_extinfo_list(pkg->replaces, PKG_REPLACES, LIST_DELIM, 1);
+	print_extinfo_list(pkg->replaces, "Replaces", LIST_DELIM, 1);
 
-	printf(PKG_CAT "       : %s\n"
-				 PKG_LICENSE "        : %s\n"
-				 PKG_NUMVOTES "          : %d\n"
-				 PKG_OOD "    : %s%s%s\n",
+	printf("Category       : %s\n"
+				 "License        : %s\n"
+				 "Votes          : %d\n"
+				 "Out of Date    : %s%s%s\n",
 				 aur_cat[pkg->cat], pkg->lic, pkg->votes,
 				 pkg->ood ? colstr->ood : colstr->utd,
 				 pkg->ood ? "Yes" : "No", colstr->nc);
 
-	printf(PKG_MAINT "     : %s\n", pkg->maint ? pkg->maint : "(orphan)");
+	printf("Maintainer     : %s\n", pkg->maint ? pkg->maint : "(orphan)");
 
 	ts = localtime(&pkg->firstsub);
-	strftime(datestring, 42, PKG_TIMEFMT, ts);
-	printf(PKG_FIRSTSUB "      : %s\n", datestring);
+	strftime(datestring, 42, "%c", ts);
+	printf("Submitted      : %s\n", datestring);
 
 	ts = localtime(&pkg->lastmod);
-	strftime(datestring, 42, PKG_TIMEFMT, ts);
-	printf(PKG_LASTMOD "  : %s\n", datestring);
+	strftime(datestring, 42, "%c", ts);
+	printf("Last Modified  : %s\n", datestring);
 
-	printf(PKG_DESC "    : ");
+	printf("Description    : ");
 	indentprint(pkg->desc, INFO_INDENT);
 	printf("\n\n");
 } /* }}} */
@@ -2194,11 +2167,11 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 
 	escaped = url_escape((char*)argstr, span, NULL);
 	if(cfg.opmask & OP_SEARCH) {
-		cwr_asprintf(&url, AUR_RPC_URL, AUR_QUERY_TYPE_SEARCH, escaped);
+		cwr_asprintf(&url, AUR_RPC_URL, "search", escaped);
 	} else if(cfg.opmask & OP_MSEARCH) {
-		cwr_asprintf(&url, AUR_RPC_URL, AUR_QUERY_TYPE_MSRCH, escaped);
+		cwr_asprintf(&url, AUR_RPC_URL, "msearch", escaped);
 	} else {
-		cwr_asprintf(&url, AUR_RPC_URL, AUR_QUERY_TYPE_INFO, escaped);
+		cwr_asprintf(&url, AUR_RPC_URL, "info", escaped);
 	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 
