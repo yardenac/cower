@@ -147,7 +147,6 @@ enum {
 	KEY_VERSION,
 	KEY_QUERY_RESULTCOUNT,
 	KEY_QUERY_RESULTS,
-	KEY_QUERY_TYPE,
 };
 
 typedef enum __pkgdetail_t {
@@ -367,8 +366,7 @@ static const struct key_t json_keys[] = {
 	{ KEY_URLPATH, "URLPath" },
 	{ KEY_VERSION, "Version" },
 	{ KEY_QUERY_RESULTCOUNT, "resultcount" },
-	{ KEY_QUERY_RESULTS, "results" },
-	{ KEY_QUERY_TYPE, "type" },
+	{ KEY_QUERY_RESULTS, "results" }
 };
 
 /* }}} */
@@ -1076,15 +1074,12 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	struct yajl_parser_t *p = ctx;
 	char **key = NULL;
 
-	if(p->key == KEY_QUERY_TYPE &&
-			STR_STARTS_WITH((const char*)data, "error")) {
-		return 1;
-	} else if(p->key == KEY_QUERY_RESULTS) {
+	switch(p->key) {
+	case KEY_QUERY_RESULTS:
+		/* usually the AUR returns this as an integer. when it shows
+		 * up as a string, it means we have an error. gross. */
 		p->error = strndup((const char*)data, size);
 		return 0;
-	}
-
-	switch(p->key) {
 	case KEY_NAME:
 		key = &p->aurpkg->name;
 		break;
