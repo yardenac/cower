@@ -2324,7 +2324,7 @@ void *thread_pool(void *arg) /* {{{ */
 static char *url_escape(char *in, int len, const char *delim) /* {{{ */
 {
 	char *tok, *escaped;
-	char buf[2048];
+	char buf[2048] = { 0 };
 
 	if(!delim) {
 		return curl_easy_escape(NULL, in, len);
