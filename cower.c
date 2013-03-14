@@ -2283,9 +2283,8 @@ void *thread_pool(void *arg) /* {{{ */
 	alpm_list_t *ret = NULL;
 	CURL *curl;
 	void *job;
-	struct task_t *task;
+	struct task_t *task = arg;
 
-	task = (struct task_t*)arg;
 	curl = curl_easy_init();
 	if(!curl) {
 		cwr_fprintf(stderr, LOG_ERROR, "curl: failed to initialize handle\n");
