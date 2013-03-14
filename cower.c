@@ -93,9 +93,6 @@
 #define BOLDCYAN              "\033[1;36m"
 #define BOLDWHITE             "\033[1;37m"
 
-#define REGEX_OPTS            REG_ICASE|REG_EXTENDED|REG_NOSUB|REG_NEWLINE
-#define REGEX_CHARS           "^.+*?$[](){}|\\"
-
 #define BRIEF_ERR             "E"
 #define BRIEF_WARN            "W"
 #define BRIEF_OK              "S"
@@ -2391,10 +2388,9 @@ void version(void) /* {{{ */
 
 size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream) /* {{{ */
 {
-	struct yajl_handle_t *hand;
+	struct yajl_handle_t *hand = stream;
 	size_t realsize = size * nmemb;
 
-	hand = (struct yajl_handle_t*)stream;
 	yajl_parse(hand, ptr, realsize);
 
 	return realsize;
