@@ -2385,9 +2385,12 @@ void version(void) /* {{{ */
 
 size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream) /* {{{ */
 {
+	struct yajl_handle_t *hand = stream;
 	size_t realsize = size * nmemb;
 
-	return yajl_parse(stream, ptr, realsize) == yajl_status_ok ? realsize : 0;
+	yajl_parse(hand, ptr, realsize);
+
+	return realsize;
 } /* }}} */
 
 int read_targets_from_file(FILE *in, alpm_list_t **targets) { /* {{{ */
