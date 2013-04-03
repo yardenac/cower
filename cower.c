@@ -55,7 +55,6 @@
 #define CALLOC(p, l, s, action) do { p = calloc(l, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
 #define FREE(x)               do { free((void*)x); x = NULL; } while(0)
 #define UNUSED                __attribute__((unused))
-#define STREQ(x,y)            (strcmp((x),(y)) == 0)
 #define STR_STARTS_WITH(x,y)  (strncmp((x),(y), strlen(y)) == 0)
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
 
@@ -221,6 +220,7 @@ struct openssl_mutex_t {
 /* }}} */
 
 /* function prototypes {{{ */
+static inline int streq(const char *, const char *);
 static alpm_list_t *alpm_find_foreign_pkgs(void);
 static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
@@ -368,6 +368,11 @@ static const struct key_t json_keys[] = {
 
 /* }}} */
 
+int streq(const char *s1, const char *s2) /* {{{ */
+{
+	return strcmp(s1, s2) == 0;
+} /* }}} */
+
 alpm_handle_t *alpm_init(void) /* {{{ */
 {
 	FILE *fp;
@@ -401,7 +406,7 @@ alpm_handle_t *alpm_init(void) /* {{{ */
 			free(section);
 			section = strndup(&line[1], linelen - 2);
 
-			if(strcmp(section, "options") != 0) {
+			if(!streq(section, "options")) {
 				if(!cfg.skiprepos && !alpm_list_find_str(cfg.ignore.repos, section)) {
 					alpm_register_syncdb(pmhandle, section, 0);
 					cwr_printf(LOG_DEBUG, "registering alpm db: %s\n", section);
@@ -414,7 +419,7 @@ alpm_handle_t *alpm_init(void) /* {{{ */
 			strsep(&ptr, "=");
 			strtrim(key);
 			strtrim(ptr);
-			if(STREQ(key, "IgnorePkg")) {
+			if(streq(key, "IgnorePkg")) {
 				for(token = strtok(ptr, "\t\n "); token; token = strtok(NULL, "\t\n ")) {
 					cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
 					cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
@@ -502,7 +507,7 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 
 			if(want_subdir) {
 				size_t entrylen = strlen(entryname);
-				if(strcmp(&entryname[entrylen - sizeof("PKGBUILD")], "/PKGBUILD") == 0) {
+				if(streq(&entryname[entrylen - sizeof("PKGBUILD")], "/PKGBUILD")) {
 					*subdir = strndup(entryname, entrylen - sizeof("PKGBUILD"));
 					cwr_printf(LOG_DEBUG, "found subdir: %s\n", *subdir);
 					want_subdir = 0;
@@ -1302,21 +1307,21 @@ int parse_configfile(void) /* {{{ */
 
 		/* colors are not initialized in this section, so usage of cwr_printf
 		 * functions is verboten unless we're using loglevel_t LOG_DEBUG */
-		if(STREQ(key, "IgnoreRepo")) {
+		if(streq(key, "IgnoreRepo")) {
 			for(key = strtok(val, " "); key; key = strtok(NULL, " ")) {
 				cwr_printf(LOG_DEBUG, "ignoring repo: %s\n", key);
 				cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(key));
 			}
-		} else if(STREQ(key, "IgnorePkg")) {
+		} else if(streq(key, "IgnorePkg")) {
 			for(key = strtok(val, " "); key; key = strtok(NULL, " ")) {
 				cwr_printf(LOG_DEBUG, "ignoring package: %s\n", key);
 				cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
 			}
-		} else if(STREQ(key, "IgnoreOOD")) {
+		} else if(streq(key, "IgnoreOOD")) {
 			if(cfg.ignoreood == kUnset) {
 				cfg.ignoreood = 1;
 			}
-		} else if(STREQ(key, "TargetDir")) {
+		} else if(streq(key, "TargetDir")) {
 			if(val && !cfg.dlpath) {
 				wordexp_t p;
 				if(wordexp(val, &p, 0) == 0) {
@@ -1334,7 +1339,7 @@ int parse_configfile(void) /* {{{ */
 					ret = 1;
 				}
 			}
-		} else if(STREQ(key, "MaxThreads")) {
+		} else if(streq(key, "MaxThreads")) {
 			if(val && cfg.maxthreads == kUnset) {
 				cfg.maxthreads = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.maxthreads <= 0) {
@@ -1342,7 +1347,7 @@ int parse_configfile(void) /* {{{ */
 					ret = 1;
 				}
 			}
-		} else if(STREQ(key, "ConnectTimeout")) {
+		} else if(streq(key, "ConnectTimeout")) {
 			if(val && cfg.timeout == kUnset) {
 				cfg.timeout = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.timeout < 0) {
@@ -1350,17 +1355,17 @@ int parse_configfile(void) /* {{{ */
 					ret = 1;
 				}
 			}
-		} else if(STREQ(key, "Color")) {
+		} else if(streq(key, "Color")) {
 			if(cfg.color == kUnset) {
-				if(!val || STREQ(val, "auto")) {
+				if(!val || streq(val, "auto")) {
 					if(isatty(fileno(stdout))) {
 						cfg.color = 1;
 					} else {
 						cfg.color = 0;
 					}
-				} else if(STREQ(val, "always")) {
+				} else if(streq(val, "always")) {
 					cfg.color = 1;
-				} else if(STREQ(val, "never")) {
+				} else if(streq(val, "never")) {
 					cfg.color = 0;
 				} else {
 					fprintf(stderr, "error: invalid option to Color\n");
@@ -1448,15 +1453,15 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				cfg.logmask |= LOG_BRIEF;
 				break;
 			case 'c':
-				if(!optarg || STREQ(optarg, "auto")) {
+				if(!optarg || streq(optarg, "auto")) {
 					if(isatty(fileno(stdout))) {
 						cfg.color = 1;
 					} else {
 						cfg.color = 0;
 					}
-				} else if(STREQ(optarg, "always")) {
+				} else if(streq(optarg, "always")) {
 					cfg.color = 1;
-				} else if(STREQ(optarg, "never")) {
+				} else if(streq(optarg, "never")) {
 					cfg.color = 0;
 				} else {
 					fprintf(stderr, "invalid argument to --color\n");
