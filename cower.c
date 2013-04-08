@@ -53,7 +53,6 @@
 #define ALLOC_FAIL(s) do { cwr_fprintf(stderr, LOG_ERROR, "could not allocate %zd bytes\n", s); } while(0)
 #define MALLOC(p, s, action) do { p = calloc(1, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
 #define CALLOC(p, l, s, action) do { p = calloc(l, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
-#define FREE(x)               do { free((void*)x); x = NULL; } while(0)
 #define UNUSED                __attribute__((unused))
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
 
@@ -562,7 +561,7 @@ struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
 void aurpkg_free(void *pkg) /* {{{ */
 {
 	aurpkg_free_inner(pkg);
-	FREE(pkg);
+	free(pkg);
 } /* }}} */
 
 void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
@@ -572,13 +571,13 @@ void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
 	}
 
 	/* free allocated string fields */
-	FREE(pkg->name);
-	FREE(pkg->maint);
-	FREE(pkg->ver);
-	FREE(pkg->urlpath);
-	FREE(pkg->desc);
-	FREE(pkg->url);
-	FREE(pkg->lic);
+	free(pkg->name);
+	free(pkg->maint);
+	free(pkg->ver);
+	free(pkg->urlpath);
+	free(pkg->desc);
+	free(pkg->url);
+	free(pkg->lic);
 
 	/* free extended list info */
 	FREELIST(pkg->depends);
@@ -587,6 +586,8 @@ void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
 	FREELIST(pkg->provides);
 	FREELIST(pkg->conflicts);
 	FREELIST(pkg->replaces);
+
+	memset(pkg, sizeof(struct aurpkg_t), 0);
 } /* }}} */
 
 int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
@@ -811,9 +812,9 @@ void *download(CURL *curl, void *arg) /* {{{ */
 	}
 
 finish:
-	FREE(url);
-	FREE(response.data);
-	FREE(subdir);
+	free(url);
+	free(response.data);
+	free(subdir);
 
 	return queryresult;
 } /* }}} */
@@ -1965,7 +1966,7 @@ int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir) /*
 							!alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
 					cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
 			}
-			FREE(sanitized);
+			free(sanitized);
 		}
 
 		if(sanitized) {
@@ -1991,7 +1992,8 @@ int set_working_dir(void) /* {{{ */
 	char *resolved;
 
 	if(!(cfg.opmask & OP_DOWNLOAD)) {
-		FREE(cfg.dlpath);
+		free(cfg.dlpath);
+		cfg.dlpath = NULL;
 		return 0;
 	}
 
@@ -1999,7 +2001,8 @@ int set_working_dir(void) /* {{{ */
 	if(!resolved) {
 		fprintf(stderr, "error: failed to resolve download path %s: %s\n",
 				cfg.dlpath, strerror(errno));
-		FREE(cfg.dlpath);
+		free(cfg.dlpath);
+		cfg.dlpath = NULL;
 		return 1;
 	}
 
@@ -2009,7 +2012,8 @@ int set_working_dir(void) /* {{{ */
 	if(access(cfg.dlpath, W_OK) != 0) {
 		fprintf(stderr, "error: cannot write to %s: %s\n",
 				cfg.dlpath, strerror(errno));
-		FREE(cfg.dlpath);
+		free(cfg.dlpath);
+		cfg.dlpath = NULL;
 		return 1;
 	}
 
@@ -2221,10 +2225,10 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 finish:
 	yajl_free(yajl_hand);
 	curl_free(escaped);
-	FREE(parse_struct->aurpkg);
-	FREE(parse_struct->error);
-	FREE(parse_struct);
-	FREE(url);
+	free(parse_struct->aurpkg);
+	free(parse_struct->error);
+	free(parse_struct);
+	free(url);
 
 	return pkglist;
 } /* }}} */
@@ -2572,11 +2576,11 @@ int main(int argc, char *argv[]) {
 	openssl_crypto_cleanup();
 
 finish:
-	FREE(cfg.dlpath);
+	free(cfg.dlpath);
 	FREELIST(cfg.targets);
 	FREELIST(cfg.ignore.pkgs);
 	FREELIST(cfg.ignore.repos);
-	FREE(colstr);
+	free(colstr);
 
 	cwr_printf(LOG_DEBUG, "releasing curl\n");
 	curl_global_cleanup();
