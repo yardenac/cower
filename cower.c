@@ -50,9 +50,6 @@
 #include <yajl/yajl_parse.h>
 
 /* macros {{{ */
-#define ALLOC_FAIL(s) do { cwr_fprintf(stderr, LOG_ERROR, "could not allocate %zd bytes\n", s); } while(0)
-#define MALLOC(p, s, action) do { p = calloc(1, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
-#define CALLOC(p, l, s, action) do { p = calloc(l, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
 #define UNUSED                __attribute__((unused))
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
 
@@ -565,8 +562,8 @@ struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
 {
 	struct aurpkg_t *newpkg;
 
-	MALLOC(newpkg, sizeof(struct aurpkg_t), return NULL);
-	return memcpy(newpkg, pkg, sizeof(struct aurpkg_t));
+	newpkg = malloc(sizeof(struct aurpkg_t));
+	return newpkg ? memcpy(newpkg, pkg, sizeof(struct aurpkg_t)) : NULL;
 } /* }}} */
 
 void aurpkg_free(void *pkg) /* {{{ */
@@ -909,7 +906,7 @@ char *get_file_as_buffer(const char *path) /* {{{ */
 	fsize = ftell(fp);
 	fseek(fp, 0L, SEEK_SET);
 
-	CALLOC(buf, 1, (ssize_t)fsize + 1, return NULL);
+	buf = calloc(1, (size_t)fsize + 1);
 
 	nread = fread(buf, 1, fsize, fp);
 	fclose(fp);
@@ -967,7 +964,7 @@ void indentprint(const char *str, int indent) /* {{{ */
 	}
 
 	len = strlen(str) + 1;
-	CALLOC(wcstr, len, sizeof(wchar_t), return);
+	wcstr = calloc(len, sizeof(wchar_t));
 	len = mbstowcs(wcstr, str, len);
 	p = wcstr;
 	cidx = indent;
@@ -2155,8 +2152,8 @@ void *task_query(CURL *curl, void *arg) /* {{{ */
 		argstr = arg;
 	}
 
-	CALLOC(parse_struct, 1, sizeof(struct yajl_parser_t), return NULL);
-	CALLOC(parse_struct->aurpkg, 1, sizeof(struct aurpkg_t), return NULL);
+	parse_struct = calloc(1, sizeof(struct yajl_parser_t));
+	parse_struct->aurpkg = calloc(1, sizeof(struct aurpkg_t));
 	yajl_hand = yajl_alloc(&callbacks, NULL, (void*)parse_struct);
 
 	curl = curl_init_easy_handle(curl);
@@ -2531,7 +2528,11 @@ int main(int argc, char *argv[]) {
 		num_threads = cfg.maxthreads;
 	}
 
-	CALLOC(threads, num_threads, sizeof(pthread_t), goto finish);
+	threads = malloc(num_threads * sizeof(pthread_t));
+	if(threads == NULL) {
+		cwr_fprintf(stderr, LOG_ERROR, "could not allocate memory for threads\n");
+		goto finish;
+	}
 
 	/* override task behavior */
 	if(cfg.opmask & OP_UPDATE) {
