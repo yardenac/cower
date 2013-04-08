@@ -305,10 +305,10 @@ static struct {
 } cfg; /* }}} */
 
 /* globals {{{ */
-alpm_handle_t *pmhandle;
-alpm_db_t *db_local;
-alpm_list_t *workq;
-struct openssl_mutex_t openssl_lock;
+static alpm_handle_t *pmhandle;
+static alpm_db_t *db_local;
+static alpm_list_t *workq;
+static struct openssl_mutex_t openssl_lock;
 static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
 
 static const int kUnset = -1;
@@ -361,7 +361,7 @@ static const struct key_t json_keys[] = {
 	{ KEY_QUERY_RESULTS, "results" }
 };
 
-struct strings_t colstr = {
+static struct strings_t colstr = {
 	.error = "error:",
 	.warn = "warning:",
 	.info = "::",
