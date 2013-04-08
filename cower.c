@@ -55,7 +55,6 @@
 #define CALLOC(p, l, s, action) do { p = calloc(l, s); if(!p) { ALLOC_FAIL(s); action; } } while(0)
 #define FREE(x)               do { free((void*)x); x = NULL; } while(0)
 #define UNUSED                __attribute__((unused))
-#define STR_STARTS_WITH(x,y)  (strncmp((x),(y), strlen(y)) == 0)
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
 
 #ifndef PACMAN_ROOT
@@ -221,6 +220,7 @@ struct openssl_mutex_t {
 
 /* function prototypes {{{ */
 static inline int streq(const char *, const char *);
+static inline int startswith(const char *, const char *);
 static alpm_list_t *alpm_find_foreign_pkgs(void);
 static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
@@ -371,6 +371,11 @@ static const struct key_t json_keys[] = {
 int streq(const char *s1, const char *s2) /* {{{ */
 {
 	return strcmp(s1, s2) == 0;
+} /* }}} */
+
+int startswith(const char *s1, const char *s2) /* {{{ */
+{
+	return strncmp(s1, s2, strlen(s2)) == 0;
 } /* }}} */
 
 alpm_handle_t *alpm_init(void) /* {{{ */
@@ -1593,18 +1598,18 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) /* {{{ */
 			continue;
 		}
 
-		if(STR_STARTS_WITH(lineptr, "depends=(")) {
+		if(startswith(lineptr, "depends=(")) {
 			deplist = details[PKGDETAIL_DEPENDS];
-		} else if(STR_STARTS_WITH(lineptr, "makedepends=(")) {
+		} else if(startswith(lineptr, "makedepends=(")) {
 			deplist = details[PKGDETAIL_MAKEDEPENDS];
-		} else if(STR_STARTS_WITH(lineptr, "optdepends=(")) {
+		} else if(startswith(lineptr, "optdepends=(")) {
 			deplist = details[PKGDETAIL_OPTDEPENDS];
 			type = PKGDETAIL_OPTDEPENDS;
-		} else if(STR_STARTS_WITH(lineptr, "provides=(")) {
+		} else if(startswith(lineptr, "provides=(")) {
 			deplist = details[PKGDETAIL_PROVIDES];
-		} else if(STR_STARTS_WITH(lineptr, "replaces=(")) {
+		} else if(startswith(lineptr, "replaces=(")) {
 			deplist = details[PKGDETAIL_REPLACES];
-		} else if(STR_STARTS_WITH(lineptr, "conflicts=(")) {
+		} else if(startswith(lineptr, "conflicts=(")) {
 			deplist = details[PKGDETAIL_CONFLICTS];
 		} else {
 			continue;
