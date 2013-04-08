@@ -308,7 +308,6 @@ static struct {
 } cfg; /* }}} */
 
 /* globals {{{ */
-struct strings_t *colstr;
 alpm_handle_t *pmhandle;
 alpm_db_t *db_local;
 alpm_list_t *workq;
@@ -363,6 +362,18 @@ static const struct key_t json_keys[] = {
 	{ KEY_VERSION, "Version" },
 	{ KEY_QUERY_RESULTCOUNT, "resultcount" },
 	{ KEY_QUERY_RESULTS, "results" }
+};
+
+struct strings_t colstr = {
+	.error = "error:",
+	.warn = "warning:",
+	.info = "::",
+	.pkg = "",
+	.repo = "",
+	.url = "",
+	.ood = "",
+	.utd = "",
+	.nc = ""
 };
 
 /* }}} */
@@ -642,13 +653,13 @@ int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list arg
 	switch(level) {
 		case LOG_VERBOSE:
 		case LOG_INFO:
-			prefix = colstr->info;
+			prefix = colstr.info;
 			break;
 		case LOG_ERROR:
-			prefix = colstr->error;
+			prefix = colstr.error;
 			break;
 		case LOG_WARN:
-			prefix = colstr->warn;
+			prefix = colstr.warn;
 			break;
 		case LOG_DEBUG:
 			prefix = "debug:";
@@ -805,7 +816,7 @@ void *download(CURL *curl, void *arg) /* {{{ */
 
 	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result->name);
 	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
-			colstr->pkg, result->name, colstr->nc, cfg.dlpath);
+			colstr.pkg, result->name, colstr.nc, cfg.dlpath);
 
 	if(cfg.getdeps) {
 		resolve_dependencies(curl, arg, subdir);
@@ -1576,8 +1587,8 @@ int pkg_is_binary(const char *pkg) /* {{{ */
 	if(db) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", pkg);
 		cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s\n",
-				colstr->pkg, pkg, colstr->nc,
-				colstr->repo, db, colstr->nc);
+				colstr.pkg, pkg, colstr.nc,
+				colstr.repo, db, colstr.nc);
 		return 1;
 	}
 
@@ -1820,24 +1831,24 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	struct tm *ts;
 	alpm_pkg_t *ipkg;
 
-	printf("Repository     : %saur%s\n", colstr->repo, colstr->nc);
-	printf("Name           : %s%s%s", colstr->pkg, pkg->name, colstr->nc);
+	printf("Repository     : %saur%s\n", colstr.repo, colstr.nc);
+	printf("Name           : %s%s%s", colstr.pkg, pkg->name, colstr.nc);
 	if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 		const char *instcolor;
 		if(alpm_pkg_vercmp(pkg->ver, alpm_pkg_get_version(ipkg)) > 0) {
-			instcolor = colstr->ood;
+			instcolor = colstr.ood;
 		} else {
-			instcolor = colstr->utd;
+			instcolor = colstr.utd;
 		}
-		printf(" %s[%sinstalled%s]%s", colstr->url, instcolor, colstr->url, colstr->nc);
+		printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
 	}
 	fputc('\n', stdout);
 
 	printf("Version        : %s%s%s\n",
-			pkg->ood ? colstr->ood : colstr->utd, pkg->ver, colstr->nc);
-	printf("URL            : %s%s%s\n", colstr->url, pkg->url, colstr->nc);
+			pkg->ood ? colstr.ood : colstr.utd, pkg->ver, colstr.nc);
+	printf("URL            : %s%s%s\n", colstr.url, pkg->url, colstr.nc);
 	printf("AUR Page       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
-			colstr->url, pkg->name, colstr->nc);
+			colstr.url, pkg->name, colstr.nc);
 
 	print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
 	print_extinfo_list(pkg->makedepends, "Makdepends", kListDelim, 1);
@@ -1859,8 +1870,8 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 				 "Votes          : %d\n"
 				 "Out of Date    : %s%s%s\n",
 				 aur_cat[pkg->cat], pkg->lic, pkg->votes,
-				 pkg->ood ? colstr->ood : colstr->utd,
-				 pkg->ood ? "Yes" : "No", colstr->nc);
+				 pkg->ood ? colstr.ood : colstr.utd,
+				 pkg->ood ? "Yes" : "No", colstr.nc);
 
 	printf("Maintainer     : %s\n", pkg->maint ? pkg->maint : "(orphan)");
 
@@ -1880,20 +1891,20 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 void print_pkg_search(struct aurpkg_t *pkg) /* {{{ */
 {
 	if(cfg.quiet) {
-		printf("%s%s%s\n", colstr->pkg, pkg->name, colstr->nc);
+		printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
 	} else {
 		alpm_pkg_t *ipkg;
-		printf("%saur/%s%s%s %s%s%s%s (%d)", colstr->repo, colstr->nc, colstr->pkg,
-				pkg->name, pkg->ood ? colstr->ood : colstr->utd, pkg->ver,
-				NCFLAG(pkg->ood, " <!>"), colstr->nc, pkg->votes);
+		printf("%saur/%s%s%s %s%s%s%s (%d)", colstr.repo, colstr.nc, colstr.pkg,
+				pkg->name, pkg->ood ? colstr.ood : colstr.utd, pkg->ver,
+				NCFLAG(pkg->ood, " <!>"), colstr.nc, pkg->votes);
 		if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 			const char *instcolor;
 			if(alpm_pkg_vercmp(pkg->ver, alpm_pkg_get_version(ipkg)) > 0) {
-				instcolor = colstr->ood;
+				instcolor = colstr.ood;
 			} else {
-				instcolor = colstr->utd;
+				instcolor = colstr.utd;
 			}
-			printf(" %s[%sinstalled%s]%s", colstr->url, instcolor, colstr->url, colstr->nc);
+			printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
 		}
 		printf("\n    ");
 		indentprint(pkg->desc, kSearchIndent);
@@ -2028,28 +2039,16 @@ int set_working_dir(void) /* {{{ */
 
 int strings_init(void) /* {{{ */
 {
-	MALLOC(colstr, sizeof(struct strings_t), return 1);
-
 	if(cfg.color > 0) {
-		colstr->error = BOLDRED "::" NC;
-		colstr->warn = BOLDYELLOW "::" NC;
-		colstr->info = BOLDBLUE "::" NC;
-		colstr->pkg = BOLD;
-		colstr->repo = BOLDMAGENTA;
-		colstr->url = BOLDCYAN;
-		colstr->ood = BOLDRED;
-		colstr->utd = BOLDGREEN;
-		colstr->nc = NC;
-	} else {
-		colstr->error = "error:";
-		colstr->warn = "warning:";
-		colstr->info = "::";
-		colstr->pkg = "";
-		colstr->repo = "";
-		colstr->url = "";
-		colstr->ood = "";
-		colstr->utd = "";
-		colstr->nc = "";
+		colstr.error = BOLDRED "::" NC;
+		colstr.warn = BOLDYELLOW "::" NC;
+		colstr.info = BOLDBLUE "::" NC;
+		colstr.pkg = BOLD;
+		colstr.repo = BOLDMAGENTA;
+		colstr.url = BOLDCYAN;
+		colstr.ood = BOLDRED;
+		colstr.utd = BOLDGREEN;
+		colstr.nc = NC;
 	}
 
 	/* guard against delim being something other than kListDelim if extinfo
@@ -2241,7 +2240,7 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 	const char *candidate = arg;
 
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
-			colstr->pkg, candidate, colstr->nc);
+			colstr.pkg, candidate, colstr.nc);
 
 	qretval = task_query(curl, arg);
 	aurpkg = qretval ? ((alpm_list_t*)qretval)->data : NULL;
@@ -2259,9 +2258,9 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 			if(alpm_list_find_str(cfg.ignore.pkgs, arg)) {
 				if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
 					cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
-							colstr->pkg, candidate, colstr->nc,
-							colstr->ood, alpm_pkg_get_version(pmpkg), colstr->nc,
-							colstr->utd, aurpkg->ver, colstr->nc);
+							colstr.pkg, candidate, colstr.nc,
+							colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
+							colstr.utd, aurpkg->ver, colstr.nc);
 				}
 				return NULL;
 			}
@@ -2273,12 +2272,12 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 				alpm_list_free(dlretval);
 			} else {
 				if(cfg.quiet) {
-					printf("%s%s%s\n", colstr->pkg, candidate, colstr->nc);
+					printf("%s%s%s\n", colstr.pkg, candidate, colstr.nc);
 				} else {
 					cwr_printf(LOG_INFO, "%s%s %s%s%s -> %s%s%s\n",
-							colstr->pkg, candidate,
-							colstr->ood, alpm_pkg_get_version(pmpkg), colstr->nc,
-							colstr->utd, aurpkg->ver, colstr->nc);
+							colstr.pkg, candidate,
+							colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
+							colstr.utd, aurpkg->ver, colstr.nc);
 				}
 			}
 
@@ -2580,7 +2579,6 @@ finish:
 	FREELIST(cfg.targets);
 	FREELIST(cfg.ignore.pkgs);
 	FREELIST(cfg.ignore.repos);
-	free(colstr);
 
 	cwr_printf(LOG_DEBUG, "releasing curl\n");
 	curl_global_cleanup();
