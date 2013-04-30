@@ -113,6 +113,8 @@ typedef enum __operation_t {
 enum {
 	OP_DEBUG = 1000,
 	OP_FORMAT,
+	OP_SORT,
+	OP_RSORT,
 	OP_IGNOREPKG,
 	OP_IGNOREREPO,
 	OP_LISTDELIM,
@@ -138,6 +140,11 @@ enum {
 	KEY_VERSION,
 	KEY_QUERY_RESULTCOUNT,
 	KEY_QUERY_RESULTS,
+};
+
+enum {
+	SORT_FORWARD = 1,
+	SORT_REVERSE = -1
 };
 
 typedef enum __pkgdetail_t {
@@ -253,6 +260,7 @@ static void openssl_thread_cb(int, int, const char*, int);
 static alpm_list_t *parse_bash_array(alpm_list_t*, char*, pkgdetail_t);
 static int parse_configfile(void);
 static int parse_options(int, char*[]);
+static int parse_keyname(char*);
 static int pkg_is_binary(const char *pkg);
 static void pkgbuild_get_extinfo(char*, alpm_list_t**[]);
 static int print_escaped(const char*);
@@ -288,6 +296,7 @@ static struct {
 
 	short color;
 	short ignoreood;
+	short sortorder;
 	int extinfo:1;
 	int force:1;
 	int getdeps:1;
@@ -296,6 +305,8 @@ static struct {
 	int frompkgbuild:1;
 	int maxthreads;
 	long timeout;
+
+	int (*sort_fn) (const struct aurpkg_t*, const struct aurpkg_t*);
 
 	alpm_list_t *targets;
 	struct {
@@ -550,12 +561,44 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 	return ret;
 } /* }}} */
 
+int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return strcmp(pkg1->name, pkg2->name);
+} /* }}} */
+
+int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return alpm_pkg_vercmp(pkg1->ver, pkg2->ver);
+} /* }}} */
+
+int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return strcmp(pkg1->maint, pkg2->maint);
+} /* }}} */
+
+int aurpkg_cmplic(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return strcmp(pkg1->lic, pkg2->lic);
+} /* }}} */
+
+int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return pkg1->votes - pkg2->votes;
+} /* }}} */
+
+int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return pkg1->ood - pkg2->ood;
+} /* }}} */
+
+int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return difftime(pkg1->lastmod, pkg2->lastmod);
+} /* }}} */
+
+int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+	return difftime(pkg1->firstsub, pkg2->firstsub);
+} /* }}} */
+
 int aurpkg_cmp(const void *p1, const void *p2) /* {{{ */
 {
 	const struct aurpkg_t *pkg1 = p1;
 	const struct aurpkg_t *pkg2 = p2;
 
-	return strcmp(pkg1->name, pkg2->name);
+	return cfg.sortorder * (cfg.sort_fn)(pkg1, pkg2);
 } /* }}} */
 
 struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
@@ -1417,6 +1460,8 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 		{"debug",         no_argument,        0, OP_DEBUG},
 		{"force",         no_argument,        0, 'f'},
 		{"format",        required_argument,  0, OP_FORMAT},
+		{"sort",          required_argument,  0, OP_SORT},
+		{"rsort",         required_argument,  0, OP_RSORT},
 		{"from-pkgbuild", no_argument,        0, 'p'},
 		{"help",          no_argument,        0, 'h'},
 		{"ignore",        required_argument,  0, OP_IGNOREPKG},
@@ -1506,6 +1551,14 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 			case OP_FORMAT:
 				cfg.format = optarg;
 				break;
+			case OP_RSORT:
+				cfg.sortorder = SORT_REVERSE;
+			case OP_SORT:
+				if(parse_keyname(optarg)) {
+					fprintf(stderr, "error: invalid argument to --%s\n", opts[option_index].name);
+					return 1;
+				}
+				break;
 			case 'o':
 				cfg.ignoreood = 1;
 				break;
@@ -1575,6 +1628,38 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 	}
 
 	return 0;
+} /* }}} */
+
+int parse_keyname(char* keyname) { /*{{{*/
+	if(streq("name", keyname)) {
+		cfg.sort_fn = aurpkg_cmpname;
+		return 0;
+	} else if(streq("votes", keyname)) {
+		cfg.sort_fn = aurpkg_cmpvotes;
+		return 0;
+	} else if(streq("version", keyname)) {
+		cfg.sort_fn = aurpkg_cmpver;
+		return 0;
+	} else if(streq("maintainer", keyname)) {
+		cfg.sort_fn = aurpkg_cmpmaint;
+		return 0;
+	} else if(streq("licence", keyname)) {
+		cfg.sort_fn = aurpkg_cmplic;
+		return 0;
+	} else if(streq("votes", keyname)) {
+		cfg.sort_fn = aurpkg_cmpvotes;
+		return 0;
+	} else if(streq("outofdate", keyname)) {
+		cfg.sort_fn = aurpkg_cmpood;
+		return 0;
+	} else if(streq("lastmodified", keyname)) {
+		cfg.sort_fn = aurpkg_cmplastmod;
+		return 0;
+	} else if(streq("firstsubmitted", keyname)) {
+		cfg.sort_fn = aurpkg_cmpfirstsub;
+		return 0;
+	}
+	return 1;
 } /* }}} */
 
 int pkg_is_binary(const char *pkg) /* {{{ */
@@ -2374,6 +2459,8 @@ void usage(void) /* {{{ */
 	    "      --format <string>   print package output according to format string\n"
 	    "  -o, --ignore-ood        skip displaying out of date packages\n"
 	    "      --no-ignore-ood     the opposite of --ignore-ood\n"
+	    "      --sort=<key>        sort results in ascending order by key\n"
+	    "      --rsort=<key>       sort results in descending order by key\n"
 	    "      --listdelim <delim> change list format delimeter\n"
 	    "  -q, --quiet             output less\n"
 	    "  -v, --verbose           output more\n\n");
@@ -2451,6 +2538,8 @@ int main(int argc, char *argv[]) {
 	cfg.delim = kListDelim;
 	cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
 	cfg.ignoreood = kUnset;
+	cfg.sort_fn = aurpkg_cmpname;
+	cfg.sortorder = SORT_FORWARD;
 
 	ret = parse_options(argc, argv);
 	switch(ret) {

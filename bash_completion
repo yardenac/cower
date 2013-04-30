@@ -11,12 +11,16 @@ _cower() {
   opts="-d --download -i --info -m --msearch -s --search -u --update -c --color
         -f --force --format -h --help --ignore -o --ignore-ood --no-ignore-ood
         --ignorerepo --listdelim -p --from-pkgbuild -q --quiet -t --target
-        --threads --debug -v --verbose"
+        --sort --rsort --threads --debug -v --verbose"
+
+  sortopts="firstsubmitted lastmodified license maintainer name outofdate version votes"
 
   n=${#COMP_WORDS[@]}
 
   if [[ $cur = -* ]]; then # options
     COMPREPLY=($(compgen -W "$opts" -- $cur))
+  elif [[ $prev = --?(r)sort ]]; then # sort keys
+    COMPREPLY=($(compgen -W "$sortopts" -- $cur))
   elif [[ $prev = @(-*t|--target) ]]; then # directories
     _filedir -d
   elif [[ $prev = --ignore ]]; then # installed packages

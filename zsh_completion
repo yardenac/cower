@@ -20,6 +20,8 @@ _cower_opts_general=(
   '-t[Specify an alternate download directory]:target:_files -/'
   '--threads[Limit number of threads created]:number of threads'
   '--timeout[Specify connection timeout in seconds]:timeout'
+  '--sort[Sort results in ascending order by key]:key:_cower_completions_key'
+  '--rsort[Sort results in descending order by key]:key:_cower_completions_key'
 )
 
 _cower_opts_output=(
@@ -62,6 +64,12 @@ _cower_completions_format() {
     arguments+=(%C %D %M %O %P %R)
   fi
   compadd "$@" -a arguments
+}
+
+_cower_completions_key() {
+  local -a keys
+  keys=('firstsubmitted' 'lastmodified' 'license' 'maintainer' 'name' 'outofdate' 'version' 'votes')
+  compadd "$@" -a keys
 }
 
 _cower() {
