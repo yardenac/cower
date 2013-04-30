@@ -595,7 +595,7 @@ void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
 	FREELIST(pkg->conflicts);
 	FREELIST(pkg->replaces);
 
-	memset(pkg, sizeof(struct aurpkg_t), 0);
+	memset(pkg, 0, sizeof(struct aurpkg_t));
 } /* }}} */
 
 int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
