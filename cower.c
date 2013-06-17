@@ -1295,7 +1295,7 @@ int parse_configfile(void) /* {{{ */
 		return 0; /* not an error, just nothing to do here */
 	}
 
-	while(fgets(line, PATH_MAX, fp)) {
+	while(fgets(line, sizeof(line), fp)) {
 		char *key, *val;
 		size_t linelen;
 
