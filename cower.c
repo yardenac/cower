@@ -1544,7 +1544,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				break;
 			case 'V':
 				version();
-				return 2;
+				exit(0);
 			case OP_DEBUG:
 				cfg.logmask |= LOG_DEBUG;
 				break;
@@ -2548,7 +2548,6 @@ int main(int argc, char *argv[]) {
 		case 3:
 			fprintf(stderr, "error: no operation specified (use -h for help)\n");
 		case 1: /* these provide their own error mesg */
-		case 2:
 			return ret;
 	}
 
