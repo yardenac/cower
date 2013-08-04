@@ -1,41 +1,104 @@
 #!/bin/bash
 
+__inarray() {
+  local i
+  for i in "${@:2}"; do
+    [[ $i == "$1" ]] && return
+  done
+}
+
 _cower() {
-  local i cur prev opts ng
+  local argv0=${COMP_WORDS[0]}
+  local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]} prevprev=${COMP_WORDS[COMP_CWORD - 2]}
+  local modes=(-d --download -i --info -m --msearch -s --search -u --update)
+  local generalopts=(-f --force -h --help --ignore --ignorerepo -t --target --threads
+                     --timeout -V --version)
+  local outputopts=(-b --brief -c --color --debug --format -o --ignore-ood --no-ignore-ood
+                    --sort --rsort --listdelim -q --quiet -v --verbose)
 
-  _get_comp_words_by_ref cur prev
+  local sortfields=(firstsubmitted lastmodified license maintainer name outofdate version votes)
+  local allopts=("${modes[@]}" "${generalopts[@]}" "${outputopts[@]}")
 
-  # nullglob avoids problems when no results are found
-  shopt -q nullglob || { shopt -s nullglob; ng=1; }
-
-  opts="-d --download -i --info -m --msearch -s --search -u --update -c --color
-        -f --force --format -h --help --ignore -o --ignore-ood --no-ignore-ood
-        --ignorerepo --listdelim -p --from-pkgbuild -q --quiet -t --target
-        --sort --rsort --threads --debug -v --verbose"
-
-  sortopts="firstsubmitted lastmodified license maintainer name outofdate version votes"
-
-  n=${#COMP_WORDS[@]}
-
-  if [[ $cur = -* ]]; then # options
-    COMPREPLY=($(compgen -W "$opts" -- $cur))
-  elif [[ $prev = --?(r)sort ]]; then # sort keys
-    COMPREPLY=($(compgen -W "$sortopts" -- $cur))
-  elif [[ $prev = @(-*t|--target) ]]; then # directories
-    _filedir -d
-  elif [[ $prev = --ignore ]]; then # installed packages
-    COMPREPLY=($(compgen -W "$(pacman -Qq)" -- $cur))
-  elif [[ $prev = --ignorerepo ]]; then # available repos
-    COMPREPLY=($(compgen -W "$(sed '/^\[\(.*\)\]$/!d;s//\1/;/options/d' /etc/pacman.conf)" -- $cur))
-  elif [[ ${COMP_WORDS[@]:1:n-2} = *-@(!(-*)@(u)*|-update)* ]]; then # local packages
-    COMPREPLY=($(compgen -W "$(pacman -Qqm)" -- $cur))
-  elif [[ ${COMP_WORDS[@]:1:n-2} = *-@(!(-*)@(d|i)*|-download|-info)* ]]; then # aur packages
-    COMPREPLY=($(compgen -W "$("${COMP_WORDS[0]}" -sq -- ^$cur 2>/dev/null)" -- $cur))
+  # maybe mangle the arguments in case we're looking at a --longopt=$val
+  [[ $cur = '=' ]] && cur=
+  if [[ $prev = '=' ]] && __inarray "$prevprev" "${allopts[@]}"; then
+    prev=$prevprev
   fi
 
-  # restore nullglob setting
-  [[ $ng ]] && shopt -u nullglob
+  case $prev in
+    --threads|--timeout|--listdelim)
+      COMPREPLY=()
+      return 0
+      ;;
+    -t|--target)
+      COMPREPLY=($(compgen -d -- "$cur"))
+      compopt -o filenames
+      return 0
+      ;;
+    -c|--color)
+      COMPREPLY=($(compgen -W 'auto never always' -- "$cur"))
+      return 0
+      ;;
+    --rsort|--sort)
+      COMPREPLY=($(compgen -W '${sortfields[*]}' -- "$cur"))
+      return 0
+      ;;
+    --ignore)
+      COMPREPLY=($(compgen -W "$(pacman -Qqm 2>/dev/null)" -- "$cur"))
+      return 0
+      ;;
+    --ignorerepo)
+      COMPREPLY=($(compgen -W "$(sed '/^\[\(.*\)\]$/!d;s//\1/;/options/d' /etc/pacman.conf)" -- "$cur"))
+      return 0
+      ;;
+  esac
 
+  case $cur in
+    -*)
+      COMPREPLY=($(compgen -W '${allopts[*]}' -- "$cur"))
+      return 0
+      ;;
+    *)
+      # completion based on mode -- always take the last specified
+      local i j w mode
+      for (( i = 1; i < ${#COMP_WORDS[*]}; i++ )); do
+        w=${COMP_WORDS[i]}
+        if (( i == 1 )) || [[ ${COMP_WORDS[i-1]} != -* ]]; then
+          case $w in
+            # mode from shortopt (possibly a bunch mushed together)
+            -[^-]*)
+              for (( j = 0; j < ${#w}; j++ )); do
+                case ${w:j:1} in
+                  d|i|m|s|u)
+                    mode=${w:j:1}
+                    ;;
+                esac
+              done
+              ;;
+            # mode from long opt
+            --@(download|info|?(m)search|update))
+              mode=${w#--}
+              ;;
+          esac
+        fi
+      done
+      case $mode in
+        d|download|i|info)
+          # complete based on AUR matches
+          if (( ${#cur} > 2 )); then
+            COMPREPLY=($(compgen -W "$("$argv0" -sq -- "$cur" 2>/dev/null)" -- "$cur"))
+            return 0
+          fi
+          ;;
+        u|update)
+          COMPREPLY=($(compgen -W '$(pacman -Qqm 2>/dev/null)' -- "$cur"))
+          return 0
+          ;;
+        *)
+          COMPREPLY=($(compgen -W '${allopts[*]}' -- "$cur"))
+          ;;
+      esac
+  esac
 }
 
 complete -F _cower cower
