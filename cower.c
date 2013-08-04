@@ -1532,7 +1532,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 				break;
 			case 'h':
 				usage();
-				return 1;
+				exit(0);
 			case 'q':
 				cfg.quiet |= 1;
 				break;
