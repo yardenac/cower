@@ -7,17 +7,25 @@ __inarray() {
   done
 }
 
+__hasprefix() {
+  local i
+  for i in "${@:2}"; do
+    [[ $i = "$1"* ]] && return
+  done
+}
+
 _cower() {
   local argv0=${COMP_WORDS[0]}
   local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]} prevprev=${COMP_WORDS[COMP_CWORD - 2]}
-  local modes=(-d --download -i --info -m --msearch -s --search -u --update)
-  local generalopts=(-f --force -h --help --ignore --ignorerepo -t --target --threads
-                     --timeout -V --version)
-  local outputopts=(-b --brief -c --color --debug --format -o --ignore-ood --no-ignore-ood
-                    --sort --rsort --listdelim -q --quiet -v --verbose)
+
+  local shortopts=(-d -i -m -s -u -f -h -t -V -b -c -o -q -v)
+  local longopts=(--download --info --msearch --search --update --force --version
+                  --brief --debug --ignore-ood --no-ignore-ood --quiet --verbose)
+  local longoptsarg=(--ignore --ignorerepo --target --threads --timeout --color --format
+                     --sort --rsort -listdelim)
+  local allopts=("${shortopts[@]}" "${longopts[@]}" "${longoptsarg[@]}")
 
   local sortfields=(firstsubmitted lastmodified license maintainer name outofdate version votes)
-  local allopts=("${modes[@]}" "${generalopts[@]}" "${outputopts[@]}")
 
   # maybe mangle the arguments in case we're looking at a --longopt=$val
   [[ $cur = '=' ]] && cur=
@@ -26,7 +34,7 @@ _cower() {
   fi
 
   case $prev in
-    --threads|--timeout|--listdelim)
+    --format|--threads|--timeout|--listdelim)
       COMPREPLY=()
       return 0
       ;;
@@ -54,6 +62,15 @@ _cower() {
   esac
 
   case $cur in
+    --*)
+      if __hasprefix "$cur" "${longoptsarg[@]}"; then
+        compopt -o nospace
+        COMPREPLY=($(compgen -W '${longoptsarg[*]}' -S = -- "$cur"))
+      else
+        COMPREPLY=($(compgen -W '${longopts[*]}' -- "$cur"))
+      fi
+      return 0
+      ;;
     -*)
       COMPREPLY=($(compgen -W '${allopts[*]}' -- "$cur"))
       return 0
