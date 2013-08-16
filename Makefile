@@ -15,6 +15,8 @@ CFLAGS    := -std=c99 -g -pedantic -Wall -Wextra -pthread $(CFLAGS)
 LDFLAGS   := -pthread $(LDFLAGS)
 LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto
 
+bash_completiondir=$(shell pkg-config --variable=completionsdir bash-completion)
+
 MANPAGES = \
 	cower.1
 
@@ -30,14 +32,14 @@ strip: $(OUT)
 install: all
 	install -D -m755 cower $(DESTDIR)$(PREFIX)/bin/cower
 	install -D -m644 cower.1 $(DESTDIR)$(MANPREFIX)/man1/cower.1
-	install -D -m644 bash_completion $(DESTDIR)/usr/share/bash-completion/completions/cower
+	install -D -m644 bash_completion $(DESTDIR)$(bash_completiondir)/cower
 	install -D -m644 zsh_completion $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower
 	install -D -m644 config $(DESTDIR)$(PREFIX)/share/doc/cower/config
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/cower \
 		$(DESTDIR)/$(MANPREFIX)/man1/cower.1 \
-		$(DESTDIR)/etc/bash_completion.d/cower \
+		$(DESTDIR)/$(bash_completiondir)/cower \
 		$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower \
 		$(DESTDIR)$(PREFIX)/share/doc/cower/config
 
