@@ -38,8 +38,8 @@ install: all
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/cower \
-		$(DESTDIR)/$(MANPREFIX)/man1/cower.1 \
-		$(DESTDIR)/$(bash_completiondir)/cower \
+		$(DESTDIR)$(MANPREFIX)/man1/cower.1 \
+		$(DESTDIR)$(bash_completiondir)/cower \
 		$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower \
 		$(DESTDIR)$(PREFIX)/share/doc/cower/config
 
