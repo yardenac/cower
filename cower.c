@@ -1616,7 +1616,7 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 	if(NOT_EXCL(OP_INFO) || NOT_EXCL(OP_SEARCH) || NOT_EXCL(OP_MSEARCH) ||
 			NOT_EXCL(OP_UPDATE|OP_DOWNLOAD)) {
 		fprintf(stderr, "error: invalid operation\n");
-		return 2;
+		return 1;
 	}
 
 	while(optind < argc) {
