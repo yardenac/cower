@@ -229,6 +229,14 @@ static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*, char**);
+static int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmplic(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
 static int aurpkg_cmp(const void*, const void*);
 static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t*);
 static void aurpkg_free(void*);
@@ -561,6 +569,14 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 	return ret;
 } /* }}} */
 
+int aurpkg_cmp(const void *p1, const void *p2) /* {{{ */
+{
+	const struct aurpkg_t *pkg1 = p1;
+	const struct aurpkg_t *pkg2 = p2;
+
+	return cfg.sortorder * (cfg.sort_fn)(pkg1, pkg2);
+} /* }}} */
+
 int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
 	return strcmp(pkg1->name, pkg2->name);
 } /* }}} */
@@ -591,14 +607,6 @@ int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) 
 
 int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
 	return difftime(pkg1->firstsub, pkg2->firstsub);
-} /* }}} */
-
-int aurpkg_cmp(const void *p1, const void *p2) /* {{{ */
-{
-	const struct aurpkg_t *pkg1 = p1;
-	const struct aurpkg_t *pkg2 = p2;
-
-	return cfg.sortorder * (cfg.sort_fn)(pkg1, pkg2);
 } /* }}} */
 
 struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
