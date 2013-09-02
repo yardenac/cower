@@ -2459,8 +2459,8 @@ void usage(void) /* {{{ */
 	    "      --format <string>   print package output according to format string\n"
 	    "  -o, --ignore-ood        skip displaying out of date packages\n"
 	    "      --no-ignore-ood     the opposite of --ignore-ood\n"
-	    "      --sort=<key>        sort results in ascending order by key\n"
-	    "      --rsort=<key>       sort results in descending order by key\n"
+	    "      --sort <key>        sort results in ascending order by key\n"
+	    "      --rsort <key>       sort results in descending order by key\n"
 	    "      --listdelim <delim> change list format delimeter\n"
 	    "  -q, --quiet             output less\n"
 	    "  -v, --verbose           output more\n\n");
