@@ -1941,7 +1941,7 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 			colstr.url, pkg->name, colstr.nc);
 
 	print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
-	print_extinfo_list(pkg->makedepends, "Makdepends", kListDelim, 1);
+	print_extinfo_list(pkg->makedepends, "Makedepends", kListDelim, 1);
 	print_extinfo_list(pkg->provides, "Provides", kListDelim, 1);
 	print_extinfo_list(pkg->conflicts, "Conflicts With", kListDelim, 1);
 
