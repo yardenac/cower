@@ -241,6 +241,7 @@ static int aurpkg_cmp(const void*, const void*);
 static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(struct aurpkg_t*);
+static const char *category_id_to_string(size_t id);
 static CURL *curl_init_easy_handle(CURL*);
 static char *curl_get_url_as_buffer(CURL*, const char*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
@@ -360,7 +361,7 @@ static char const *printf_flags = "'-+ #0I";
 static const char *aur_cat[] = { NULL, "None", "daemons", "devel", "editors",
                                 "emulators", "games", "gnome", "i18n", "kde", "lib",
                                 "modules", "multimedia", "network", "office",
-                                "science", "system", "x11", "xfce", "kernels" };
+                                "science", "system", "x11", "xfce", "kernels", "fonts" };
 
 static const struct key_t json_keys[] = {
 	{ KEY_CATEGORY, "CategoryID" },
@@ -648,6 +649,15 @@ void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
 
 	memset(pkg, 0, sizeof(struct aurpkg_t));
 } /* }}} */
+
+const char *category_id_to_string(size_t id) /* {{{ */
+{
+	if(id >= (sizeof(aur_cat)/sizeof(aur_cat[0] + 1))) {
+		return "Unknown";
+	} else {
+		return aur_cat[id];
+	}
+}
 
 int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
 {
@@ -1834,7 +1844,7 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 					printf(fmt, buf);
 					break;
 				case 'c':
-					printf(fmt, aur_cat[pkg->cat]);
+					printf(fmt, category_id_to_string(pkg->cat));
 					break;
 				case 'd':
 					printf(fmt, pkg->desc);
@@ -1959,7 +1969,7 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 				 "License        : %s\n"
 				 "Votes          : %d\n"
 				 "Out of Date    : %s%s%s\n",
-				 aur_cat[pkg->cat], pkg->lic, pkg->votes,
+				 category_id_to_string(pkg->cat), pkg->lic, pkg->votes,
 				 pkg->ood ? colstr.ood : colstr.utd,
 				 pkg->ood ? "Yes" : "No", colstr.nc);
 
