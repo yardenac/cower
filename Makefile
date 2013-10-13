@@ -15,7 +15,7 @@ CFLAGS    := -std=c99 -g -pedantic -Wall -Wextra -pthread $(CFLAGS)
 LDFLAGS   := -pthread $(LDFLAGS)
 LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto
 
-bash_completiondir=$(shell pkg-config --variable=completionsdir bash-completion)
+bash_completiondir = /usr/share/bash-completion/completions
 
 MANPAGES = \
 	cower.1
