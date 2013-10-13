@@ -3,4 +3,4 @@
 cower
 *.json
 cower.1
-cscope.out
+.ycm_extra_conf.pyc
