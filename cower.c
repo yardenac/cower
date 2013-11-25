@@ -28,6 +28,7 @@
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <getopt.h>
 #include <locale.h>
 #include <pthread.h>
@@ -241,6 +242,7 @@ static int aurpkg_cmp(const void*, const void*);
 static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(struct aurpkg_t*);
+static int globcompare(const void *a, const void *b);
 static const char *category_id_to_string(size_t id);
 static CURL *curl_init_easy_handle(CURL*);
 static char *curl_get_url_as_buffer(CURL*, const char*);
@@ -622,6 +624,11 @@ void aurpkg_free(void *pkg) /* {{{ */
 {
 	aurpkg_free_inner(pkg);
 	free(pkg);
+} /* }}} */
+
+int globcompare(const void *a, const void *b) /* {{{ */
+{
+	return fnmatch(a, b, 0);
 } /* }}} */
 
 void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
@@ -2355,7 +2362,7 @@ void *task_update(CURL *curl, void *arg) /* {{{ */
 		}
 
 		if(alpm_pkg_vercmp(aurpkg->ver, alpm_pkg_get_version(pmpkg)) > 0) {
-			if(alpm_list_find_str(cfg.ignore.pkgs, arg)) {
+			if(alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
 				if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
 					cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
 							colstr.pkg, candidate, colstr.nc,
