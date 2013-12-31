@@ -50,7 +50,7 @@
 #include <openssl/crypto.h>
 #include <yajl/yajl_parse.h>
 
-/* macros {{{ */
+/* macros */
 #define UNUSED                __attribute__((unused))
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
 
@@ -91,9 +91,8 @@
 #define BRIEF_ERR             "E"
 #define BRIEF_WARN            "W"
 #define BRIEF_OK              "S"
-/* }}} */
 
-/* typedefs and objects {{{ */
+/* typedefs and objects */
 typedef enum __loglevel_t {
 	LOG_INFO    = 1,
 	LOG_ERROR   = (1 << 1),
@@ -220,9 +219,8 @@ struct openssl_mutex_t {
 	pthread_mutex_t *lock;
 	long *lock_count;
 };
-/* }}} */
 
-/* function prototypes {{{ */
+/* function prototypes */
 static inline int streq(const char *, const char *);
 static inline int startswith(const char *, const char *);
 static alpm_list_t *alpm_find_foreign_pkgs(void);
@@ -294,9 +292,8 @@ static char *url_escape(char*, int, const char*);
 static void usage(void);
 static void version(void);
 static size_t yajl_parse_stream(void*, size_t, size_t, void*);
-/* }}} */
 
-/* runtime configuration {{{ */
+/* runtime configuration */
 static struct {
 	char *dlpath;
 	const char *delim;
@@ -324,9 +321,9 @@ static struct {
 	  alpm_list_t *pkgs;
 	  alpm_list_t *repos;
 	} ignore;
-} cfg; /* }}} */
+} cfg;
 
-/* globals {{{ */
+/* globals */
 static alpm_handle_t *pmhandle;
 static alpm_db_t *db_local;
 static alpm_list_t *workq;
@@ -395,19 +392,17 @@ static struct strings_t colstr = {
 	.nc = ""
 };
 
-/* }}} */
-
-int streq(const char *s1, const char *s2) /* {{{ */
+int streq(const char *s1, const char *s2)
 {
 	return strcmp(s1, s2) == 0;
-} /* }}} */
+}
 
-int startswith(const char *s1, const char *s2) /* {{{ */
+int startswith(const char *s1, const char *s2)
 {
 	return strncmp(s1, s2, strlen(s2)) == 0;
-} /* }}} */
+}
 
-alpm_handle_t *alpm_init(void) /* {{{ */
+alpm_handle_t *alpm_init(void)
 {
 	FILE *fp;
 	char line[PATH_MAX];
@@ -468,9 +463,9 @@ alpm_handle_t *alpm_init(void) /* {{{ */
 	fclose(fp);
 
 	return pmhandle;
-} /* }}} */
+}
 
-alpm_list_t *alpm_find_foreign_pkgs(void) /* {{{ */
+alpm_list_t *alpm_find_foreign_pkgs(void)
 {
 	const alpm_list_t *i;
 	alpm_list_t *ret = NULL;
@@ -484,9 +479,9 @@ alpm_list_t *alpm_find_foreign_pkgs(void) /* {{{ */
 	}
 
 	return ret;
-} /* }}} */
+}
 
-int alpm_pkg_is_foreign(alpm_pkg_t *pkg) /* {{{ */
+int alpm_pkg_is_foreign(alpm_pkg_t *pkg)
 {
 	const alpm_list_t *i;
 	const char *pkgname;
@@ -500,9 +495,9 @@ int alpm_pkg_is_foreign(alpm_pkg_t *pkg) /* {{{ */
 	}
 
 	return 1;
-} /* }}} */
+}
 
-const char *alpm_provides_pkg(const char *pkgname) /* {{{ */
+const char *alpm_provides_pkg(const char *pkgname)
 {
 	const alpm_list_t *i;
 	const char *dbname = NULL;
@@ -519,9 +514,9 @@ const char *alpm_provides_pkg(const char *pkgname) /* {{{ */
 	pthread_mutex_unlock(&alpmlock);
 
 	return dbname;
-} /* }}} */
+}
 
-int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
+int archive_extract_file(const struct response_t *file, char **subdir)
 {
 	struct archive *archive;
 	struct archive_entry *entry;
@@ -570,68 +565,68 @@ int archive_extract_file(const struct response_t *file, char **subdir) /* {{{ */
 	}
 
 	return ret;
-} /* }}} */
+}
 
-int aurpkg_cmp(const void *p1, const void *p2) /* {{{ */
+int aurpkg_cmp(const void *p1, const void *p2)
 {
 	const struct aurpkg_t *pkg1 = p1;
 	const struct aurpkg_t *pkg2 = p2;
 
 	return cfg.sortorder * (cfg.sort_fn)(pkg1, pkg2);
-} /* }}} */
+}
 
-int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return strcmp(pkg1->name, pkg2->name);
-} /* }}} */
+}
 
-int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return alpm_pkg_vercmp(pkg1->ver, pkg2->ver);
-} /* }}} */
+}
 
-int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return strcmp(pkg1->maint, pkg2->maint);
-} /* }}} */
+}
 
-int aurpkg_cmplic(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmplic(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return strcmp(pkg1->lic, pkg2->lic);
-} /* }}} */
+}
 
-int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return pkg1->votes - pkg2->votes;
-} /* }}} */
+}
 
-int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return pkg1->ood - pkg2->ood;
-} /* }}} */
+}
 
-int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return difftime(pkg1->lastmod, pkg2->lastmod);
-} /* }}} */
+}
 
-int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) { /* {{{ */
+int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return difftime(pkg1->firstsub, pkg2->firstsub);
-} /* }}} */
+}
 
-struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg) /* {{{ */
+struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg)
 {
 	struct aurpkg_t *newpkg;
 
 	newpkg = malloc(sizeof(struct aurpkg_t));
 	return newpkg ? memcpy(newpkg, pkg, sizeof(struct aurpkg_t)) : NULL;
-} /* }}} */
+}
 
-void aurpkg_free(void *pkg) /* {{{ */
+void aurpkg_free(void *pkg)
 {
 	aurpkg_free_inner(pkg);
 	free(pkg);
-} /* }}} */
+}
 
-int globcompare(const void *a, const void *b) /* {{{ */
+int globcompare(const void *a, const void *b)
 {
 	return fnmatch(a, b, 0);
-} /* }}} */
+}
 
-void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
+void aurpkg_free_inner(struct aurpkg_t *pkg)
 {
 	if(!pkg) {
 		return;
@@ -655,9 +650,9 @@ void aurpkg_free_inner(struct aurpkg_t *pkg) /* {{{ */
 	FREELIST(pkg->replaces);
 
 	memset(pkg, 0, sizeof(struct aurpkg_t));
-} /* }}} */
+}
 
-const char *category_id_to_string(size_t id) /* {{{ */
+const char *category_id_to_string(size_t id)
 {
 	if(id >= (sizeof(aur_cat)/sizeof(aur_cat[0] + 1))) {
 		return "Unknown";
@@ -666,7 +661,7 @@ const char *category_id_to_string(size_t id) /* {{{ */
 	}
 }
 
-int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
+int cwr_asprintf(char **string, const char *format, ...)
 {
 	int ret = 0;
 	va_list args;
@@ -680,9 +675,9 @@ int cwr_asprintf(char **string, const char *format, ...) /* {{{ */
 	}
 
 	return ret;
-} /* }}} */
+}
 
-int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...) /* {{{ */
+int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...)
 {
 	int ret;
 	va_list args;
@@ -692,9 +687,9 @@ int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...) /* {{{ 
 	va_end(args);
 
 	return ret;
-} /* }}} */
+}
 
-int cwr_printf(loglevel_t level, const char *format, ...) /* {{{ */
+int cwr_printf(loglevel_t level, const char *format, ...)
 {
 	int ret;
 	va_list args;
@@ -704,9 +699,9 @@ int cwr_printf(loglevel_t level, const char *format, ...) /* {{{ */
 	va_end(args);
 
 	return ret;
-} /* }}} */
+}
 
-int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list args) /* {{{ */
+int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list args)
 {
 	const char *prefix;
 	char bufout[128];
@@ -738,9 +733,9 @@ int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list arg
 	snprintf(bufout, 128, "%s %s", prefix, format);
 
 	return vfprintf(stream, bufout, args);
-} /* }}} */
+}
 
-CURL *curl_init_easy_handle(CURL *handle) /* {{{ */
+CURL *curl_init_easy_handle(CURL *handle)
 {
 	if(!handle) {
 		return NULL;
@@ -759,9 +754,9 @@ CURL *curl_init_easy_handle(CURL *handle) /* {{{ */
 	}
 
 	return handle;
-} /* }}} */
+}
 
-char *curl_get_url_as_buffer(CURL *curl, const char *url) /* {{{ */
+char *curl_get_url_as_buffer(CURL *curl, const char *url)
 {
 	long httpcode;
 	struct response_t response = { NULL, 0 };
@@ -788,9 +783,9 @@ char *curl_get_url_as_buffer(CURL *curl, const char *url) /* {{{ */
 
 finish:
 	return response.data;
-} /* }}} */
+}
 
-size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream) /* {{{ */
+size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	void *newdata;
 	size_t realsize = size * nmemb;
@@ -809,9 +804,9 @@ size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream) /
 	}
 
 	return realsize;
-} /* }}} */
+}
 
-void *download(CURL *curl, void *arg) /* {{{ */
+void *download(CURL *curl, void *arg)
 {
 	alpm_list_t *queryresult = NULL;
 	struct aurpkg_t *result;
@@ -893,9 +888,9 @@ finish:
 	free(subdir);
 
 	return queryresult;
-} /* }}} */
+}
 
-alpm_list_t *filter_results(alpm_list_t *list) /* {{{ */
+alpm_list_t *filter_results(alpm_list_t *list)
 {
 	const alpm_list_t *i, *j;
 	alpm_list_t *filterlist = NULL;
@@ -931,9 +926,9 @@ alpm_list_t *filter_results(alpm_list_t *list) /* {{{ */
 	}
 
 	return alpm_list_msort(filterlist, alpm_list_count(filterlist), aurpkg_cmp);
-} /* }}} */
+}
 
-int getcols(void) /* {{{ */
+int getcols(void)
 {
 	int termwidth = -1;
 	const int default_tty = 80;
@@ -955,9 +950,9 @@ int getcols(void) /* {{{ */
 	}
 #endif
 	return termwidth <= 0 ? default_tty : termwidth;
-} /* }}} */
+}
 
-char *get_file_as_buffer(const char *path) /* {{{ */
+char *get_file_as_buffer(const char *path)
 {
 	FILE *fp;
 	char *buf;
@@ -985,9 +980,9 @@ char *get_file_as_buffer(const char *path) /* {{{ */
 	}
 
 	return buf;
-} /* }}} */
+}
 
-int get_config_path(char *config_path, size_t pathlen) /* {{{ */
+int get_config_path(char *config_path, size_t pathlen)
 {
 	char *var;
 	struct passwd *pwd;
@@ -1011,9 +1006,9 @@ int get_config_path(char *config_path, size_t pathlen) /* {{{ */
 	}
 
 	return 1;
-} /* }}} */
+}
 
-void indentprint(const char *str, int indent) /* {{{ */
+void indentprint(const char *str, int indent)
 {
 	wchar_t *wcstr;
 	const wchar_t *p;
@@ -1080,9 +1075,9 @@ void indentprint(const char *str, int indent) /* {{{ */
 		p++;
 	}
 	free(wcstr);
-} /* }}} */
+}
 
-int json_end_map(void *ctx) /* {{{ */
+int json_end_map(void *ctx)
 {
 	struct yajl_parser_t *p = ctx;
 
@@ -1096,9 +1091,9 @@ int json_end_map(void *ctx) /* {{{ */
 	}
 
 	return 1;
-} /* }}} */
+}
 
-int json_integer(void *ctx, long long val) /* {{{ */
+int json_integer(void *ctx, long long val)
 {
 	struct yajl_parser_t *p = ctx;
 
@@ -1130,18 +1125,18 @@ int json_integer(void *ctx, long long val) /* {{{ */
 	}
 
 	return 1;
-} /* }}} */
+}
 
-int json_map_key(void *ctx, const unsigned char *data, size_t size) /* {{{ */
+int json_map_key(void *ctx, const unsigned char *data, size_t size)
 {
 	struct yajl_parser_t *p = ctx;
 
 	p->key = string_to_key(data, size);
 
 	return 1;
-} /* }}} */
+}
 
-int json_start_map(void *ctx) /* {{{ */
+int json_start_map(void *ctx)
 {
 	struct yajl_parser_t *p = ctx;
 
@@ -1151,9 +1146,9 @@ int json_start_map(void *ctx) /* {{{ */
 	}
 
 	return 1;
-} /* }}} */
+}
 
-int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
+int json_string(void *ctx, const unsigned char *data, size_t size)
 {
 	struct yajl_parser_t *p = ctx;
 	char **key = NULL;
@@ -1197,17 +1192,17 @@ int json_string(void *ctx, const unsigned char *data, size_t size) /* {{{ */
 	}
 
 	return 1;
-} /* }}} */
+}
 
-int keycmp(const void *v1, const void *v2)  /* {{{ */
+int keycmp(const void *v1, const void *v2)
 {
 	const struct key_t *k1 = v1;
 	const struct key_t *k2 = v2;
 
 	return strcmp(k1->name, k2->name);
-} /* }}} */
+}
 
-alpm_list_t *load_targets_from_files(alpm_list_t *files) /* {{{ */
+alpm_list_t *load_targets_from_files(alpm_list_t *files)
 {
 	alpm_list_t *i, *targets = NULL, *results = NULL;
 
@@ -1236,9 +1231,9 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files) /* {{{ */
 	}
 
 	return targets;
-} /* }}} */
+}
 
-void openssl_crypto_cleanup(void) /* {{{ */
+void openssl_crypto_cleanup(void)
 {
 	int i;
 
@@ -1250,9 +1245,9 @@ void openssl_crypto_cleanup(void) /* {{{ */
 
 	OPENSSL_free(openssl_lock.lock);
 	OPENSSL_free(openssl_lock.lock_count);
-} /* }}} */
+}
 
-void openssl_crypto_init(void) /* {{{ */
+void openssl_crypto_init(void)
 {
 	int i;
 
@@ -1265,9 +1260,9 @@ void openssl_crypto_init(void) /* {{{ */
 
 	CRYPTO_set_id_callback(openssl_thread_id);
 	CRYPTO_set_locking_callback(openssl_thread_cb);
-} /* }}} */
+}
 
-void openssl_thread_cb(int mode, int type, const char UNUSED *file, /* {{{ */
+void openssl_thread_cb(int mode, int type, const char UNUSED *file,
 		int UNUSED line)
 {
 	if(mode & CRYPTO_LOCK) {
@@ -1277,14 +1272,14 @@ void openssl_thread_cb(int mode, int type, const char UNUSED *file, /* {{{ */
 		pthread_mutex_unlock(&(openssl_lock.lock[type]));
 		openssl_lock.lock_count[type]--;
 	}
-} /* }}} */
+}
 
-unsigned long openssl_thread_id(void) /* {{{ */
+unsigned long openssl_thread_id(void)
 {
 	return pthread_self();
-} /* }}} */
+}
 
-alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t type) /* {{{ */
+alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t type)
 {
 	char *ptr, *token, *saveptr;
 
@@ -1345,9 +1340,9 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t typ
 	}
 
 	return deplist;
-} /* }}} */
+}
 
-int parse_configfile(void) /* {{{ */
+int parse_configfile(void)
 {
 	char line[BUFSIZ], config_path[PATH_MAX];
 	int ret = 0;
@@ -1465,9 +1460,9 @@ int parse_configfile(void) /* {{{ */
 finish:
 	fclose(fp);
 	return ret;
-} /* }}} */
+}
 
-int parse_options(int argc, char *argv[]) /* {{{ */
+int parse_options(int argc, char *argv[])
 {
 	int opt, option_index = 0;
 
@@ -1653,9 +1648,10 @@ int parse_options(int argc, char *argv[]) /* {{{ */
 	}
 
 	return 0;
-} /* }}} */
+}
 
-int parse_keyname(char* keyname) { /*{{{*/
+int parse_keyname(char* keyname)
+{
 	if(streq("name", keyname)) {
 		cfg.sort_fn = aurpkg_cmpname;
 		return 0;
@@ -1685,9 +1681,9 @@ int parse_keyname(char* keyname) { /*{{{*/
 		return 0;
 	}
 	return 1;
-} /* }}} */
+}
 
-int pkg_is_binary(const char *pkg) /* {{{ */
+int pkg_is_binary(const char *pkg)
 {
 	const char *db = alpm_provides_pkg(pkg);
 
@@ -1700,9 +1696,9 @@ int pkg_is_binary(const char *pkg) /* {{{ */
 	}
 
 	return 0;
-} /* }}} */
+}
 
-void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) /* {{{ */
+void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[])
 {
 	char *lineptr;
 
@@ -1751,9 +1747,9 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[]) /* {{{ */
 			lineptr = arrayend;
 		}
 	}
-} /* }}} */
+}
 
-int print_escaped(const char *delim) /* {{{ */
+int print_escaped(const char *delim)
 {
 	const char *f;
 	int out = 0;
@@ -1797,9 +1793,9 @@ int print_escaped(const char *delim) /* {{{ */
 	}
 
 	return(out);
-} /* }}} */
+}
 
-void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *delim, int wrap) /* {{{ */
+void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *delim, int wrap)
 {
 	const alpm_list_t *next, *i;
 	size_t cols, count = 0;
@@ -1828,9 +1824,9 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 		}
 	}
 	fputc('\n', stdout);
-} /* }}} */
+}
 
-void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
+void print_pkg_formatted(struct aurpkg_t *pkg)
 {
 	const char *p;
 	char fmt[32], buf[64];
@@ -1930,9 +1926,9 @@ void print_pkg_formatted(struct aurpkg_t *pkg) /* {{{ */
 	fputc('\n', stdout);
 
 	return;
-} /* }}} */
+}
 
-void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
+void print_pkg_info(struct aurpkg_t *pkg)
 {
 	char datestring[42];
 	struct tm *ts;
@@ -1993,9 +1989,9 @@ void print_pkg_info(struct aurpkg_t *pkg) /* {{{ */
 	printf("Description    : ");
 	indentprint(pkg->desc, kInfoIndent);
 	printf("\n\n");
-} /* }}} */
+}
 
-void print_pkg_search(struct aurpkg_t *pkg) /* {{{ */
+void print_pkg_search(struct aurpkg_t *pkg)
 {
 	if(cfg.quiet) {
 		printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
@@ -2017,9 +2013,9 @@ void print_pkg_search(struct aurpkg_t *pkg) /* {{{ */
 		indentprint(pkg->desc, kSearchIndent);
 		fputc('\n', stdout);
 	}
-} /* }}} */
+}
 
-void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*)) /* {{{ */
+void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*))
 {
 	const alpm_list_t *i;
 	struct aurpkg_t *prev = NULL;
@@ -2042,9 +2038,9 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*)) /* {
 		}
 		prev = pkg;
 	}
-} /* }}} */
+}
 
-int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir) /* {{{ */
+int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir)
 {
 	const alpm_list_t *i;
 	alpm_list_t *deplist = NULL;
@@ -2103,9 +2099,9 @@ int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir) /*
 	FREELIST(deplist);
 
 	return 0;
-} /* }}} */
+}
 
-int set_working_dir(void) /* {{{ */
+int set_working_dir(void)
 {
 	char *resolved;
 
@@ -2142,9 +2138,9 @@ int set_working_dir(void) /* {{{ */
 	}
 
 	return 0;
-} /* }}} */
+}
 
-int strings_init(void) /* {{{ */
+int strings_init(void)
 {
 	if(cfg.color > 0) {
 		colstr.error = BOLDRED "::" NC;
@@ -2163,9 +2159,9 @@ int strings_init(void) /* {{{ */
 	cfg.delim = (cfg.extinfo && cfg.format) ? cfg.delim : kListDelim;
 
 	return 0;
-} /* }}} */
+}
 
-int string_to_key(const unsigned char *key, size_t len) /* {{{ */
+int string_to_key(const unsigned char *key, size_t len)
 {
 	char keybuf[32];
 	struct key_t k;
@@ -2179,9 +2175,9 @@ int string_to_key(const unsigned char *key, size_t len) /* {{{ */
 
 	return result ? result->id : -1;
 
-} /* }}} */
+}
 
-size_t strtrim(char *str) /* {{{ */
+size_t strtrim(char *str)
 {
 	char *left = str, *right;
 
@@ -2207,18 +2203,18 @@ size_t strtrim(char *str) /* {{{ */
 	*++right = '\0';
 
 	return right - left;
-} /* }}} */
+}
 
-void *task_download(CURL *curl, void *arg) /* {{{ */
+void *task_download(CURL *curl, void *arg)
 {
 	if(pkg_is_binary(arg)) {
 		return NULL;
 	} else {
 		return download(curl, arg);
 	}
-} /* }}} */
+}
 
-void *task_query(CURL *curl, void *arg) /* {{{ */
+void *task_query(CURL *curl, void *arg)
 {
 	alpm_list_t *pkglist = NULL;
 	CURLcode curlstat;
@@ -2337,9 +2333,9 @@ finish:
 	free(url);
 
 	return pkglist;
-} /* }}} */
+}
 
-void *task_update(CURL *curl, void *arg) /* {{{ */
+void *task_update(CURL *curl, void *arg)
 {
 	alpm_pkg_t *pmpkg;
 	struct aurpkg_t *aurpkg;
@@ -2396,9 +2392,9 @@ finish:
 	alpm_list_free_inner(qretval, aurpkg_free);
 	alpm_list_free(qretval);
 	return NULL;
-} /* }}} */
+}
 
-void *thread_pool(void *arg) /* {{{ */
+void *thread_pool(void *arg)
 {
 	alpm_list_t *ret = NULL;
 	CURL *curl;
@@ -2433,9 +2429,9 @@ void *thread_pool(void *arg) /* {{{ */
 	curl_easy_cleanup(curl);
 
 	return ret;
-} /* }}} */
+}
 
-static char *url_escape(char *in, int len, const char *delim) /* {{{ */
+static char *url_escape(char *in, int len, const char *delim)
 {
 	char *tok, *escaped;
 	char buf[2048] = { 0 };
@@ -2452,9 +2448,9 @@ static char *url_escape(char *in, int len, const char *delim) /* {{{ */
 	}
 
 	return strndup(buf, strlen(buf) - 1);
-} /* }}} */
+}
 
-void usage(void) /* {{{ */
+void usage(void)
 {
 	fprintf(stderr, "cower %s\n"
 	    "Usage: cower <operations> [options] target...\n\n", COWER_VERSION);
@@ -2489,9 +2485,9 @@ void usage(void) /* {{{ */
 	    "      --listdelim <delim> change list format delimeter\n"
 	    "  -q, --quiet             output less\n"
 	    "  -v, --verbose           output more\n\n");
-} /* }}} */
+}
 
-void version(void) /* {{{ */
+void version(void)
 {
 	fputs("\n  " COWER_VERSION "\n", stdout);
 	fputs("     \\\n"
@@ -2503,9 +2499,9 @@ void version(void) /* {{{ */
 	      "             |    |  ||   *\n"
 	      "\n"
 	      "             Cower....\n\n", stdout);
-} /* }}} */
+}
 
-size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream) /* {{{ */
+size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	struct yajl_handle_t *hand = stream;
 	size_t realsize = size * nmemb;
@@ -2513,9 +2509,9 @@ size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream) /* 
 	yajl_parse(hand, ptr, realsize);
 
 	return realsize;
-} /* }}} */
+}
 
-int read_targets_from_file(FILE *in, alpm_list_t **targets) { /* {{{ */
+int read_targets_from_file(FILE *in, alpm_list_t **targets) {
 	char line[BUFSIZ];
 	int i = 0, end = 0;
 	while(!end) {
@@ -2545,7 +2541,7 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) { /* {{{ */
 	}
 
 	return 0;
-} /* }}} */
+}
 
 int main(int argc, char *argv[]) {
 	alpm_list_t *results = NULL, *thread_return = NULL;
