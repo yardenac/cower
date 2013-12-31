@@ -2626,6 +2626,10 @@ int main(int argc, char *argv[]) {
 	/* allow specific updates to be provided instead of examining all foreign pkgs */
 	if((cfg.opmask & OP_UPDATE) && !cfg.targets) {
 		cfg.targets = alpm_find_foreign_pkgs();
+		if(cfg.targets == NULL) {
+			/* no foreign packages found, just exit */
+			goto finish;
+		}
 	}
 
 	workq = cfg.targets;
