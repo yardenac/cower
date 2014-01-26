@@ -1823,7 +1823,9 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 			count += print_escaped(delim);
 		}
 	}
-	fputc('\n', stdout);
+	if(wrap) {
+		fputc('\n', stdout);
+	}
 }
 
 void print_pkg_formatted(struct aurpkg_t *pkg)
