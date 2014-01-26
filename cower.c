@@ -1923,8 +1923,6 @@ void print_pkg_formatted(struct aurpkg_t *pkg)
 		}
 	}
 
-	fputc('\n', stdout);
-
 	return;
 }
 
