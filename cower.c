@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011 Dave Reisner
+/* Copyright (c) 2010-2014 Dave Reisner
  *
  * cower.c
  *
