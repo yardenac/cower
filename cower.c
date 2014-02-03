@@ -230,7 +230,6 @@ static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*, char**);
 static int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmplic(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
 static int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
 static int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
@@ -585,10 +584,6 @@ int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 
 int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
 	return strcmp(pkg1->maint, pkg2->maint);
-}
-
-int aurpkg_cmplic(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
-	return strcmp(pkg1->lic, pkg2->lic);
 }
 
 int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
@@ -1663,9 +1658,6 @@ int parse_keyname(char* keyname)
 		return 0;
 	} else if(streq("maintainer", keyname)) {
 		cfg.sort_fn = aurpkg_cmpmaint;
-		return 0;
-	} else if(streq("licence", keyname)) {
-		cfg.sort_fn = aurpkg_cmplic;
 		return 0;
 	} else if(streq("votes", keyname)) {
 		cfg.sort_fn = aurpkg_cmpvotes;

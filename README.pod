@@ -114,8 +114,8 @@ Ignore all results marked as out of date.
 =item B<--sort=>I<KEY>, B<--rsort=>I<KEY>
 
 Sort the results in ascending or descending order, respectively, by I<KEY>
-where I<KEY> is B<firstsubmitted>, B<lastmodified>, B<license>, B<maintainer>,
-B<name>, B<outofdate>, B<version> or B<votes>.
+where I<KEY> is B<firstsubmitted>, B<lastmodified>, B<maintainer>, B<name>,
+B<outofdate>, B<version> or B<votes>.
 
 =item B<-p, --from-pkgbuild>
 
