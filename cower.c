@@ -2073,6 +2073,7 @@ int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir)
 					cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
 			}
 			free(sanitized);
+			sanitized = NULL;
 		}
 
 		if(sanitized) {
