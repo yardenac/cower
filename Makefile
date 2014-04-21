@@ -30,18 +30,18 @@ strip: $(OUT)
 	strip --strip-all $(OUT)
 
 install: all
-	install -D -m755 cower $(DESTDIR)$(PREFIX)/bin/cower
-	install -D -m644 cower.1 $(DESTDIR)$(MANPREFIX)/man1/cower.1
-	install -D -m644 bash_completion $(DESTDIR)$(bash_completiondir)/cower
-	install -D -m644 zsh_completion $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower
-	install -D -m644 config $(DESTDIR)$(PREFIX)/share/doc/cower/config
+	install -D -m755 cower "$(DESTDIR)$(PREFIX)/bin/cower"
+	install -D -m644 cower.1 "$(DESTDIR)$(MANPREFIX)/man1/cower.1"
+	install -D -m644 bash_completion "$(DESTDIR)$(bash_completiondir)/cower"
+	install -D -m644 zsh_completion "$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower"
+	install -D -m644 config "$(DESTDIR)$(PREFIX)/share/doc/cower/config"
 
 uninstall:
-	$(RM) $(DESTDIR)$(PREFIX)/bin/cower \
-		$(DESTDIR)$(MANPREFIX)/man1/cower.1 \
-		$(DESTDIR)$(bash_completiondir)/cower \
-		$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower \
-		$(DESTDIR)$(PREFIX)/share/doc/cower/config
+	$(RM) "$(DESTDIR)$(PREFIX)/bin/cower" \
+		"$(DESTDIR)$(MANPREFIX)/man1/cower.1" \
+		"$(DESTDIR)$(bash_completiondir)/cower" \
+		"$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower" \
+		"$(DESTDIR)$(PREFIX)/share/doc/cower/config"
 
 dist: clean
 	mkdir cower-$(VERSION)
