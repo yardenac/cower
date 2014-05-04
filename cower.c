@@ -215,11 +215,6 @@ struct task_t {
 	void (*printfn)(struct aurpkg_t*);
 };
 
-struct openssl_mutex_t {
-	pthread_mutex_t *lock;
-	long *lock_count;
-};
-
 /* function prototypes */
 static inline int streq(const char *, const char *);
 static inline int startswith(const char *, const char *);
@@ -326,7 +321,7 @@ static struct {
 static alpm_handle_t *pmhandle;
 static alpm_db_t *db_local;
 static alpm_list_t *workq;
-static struct openssl_mutex_t openssl_lock;
+static pthread_mutex_t *openssl_lock;
 static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
 
 static const int kUnset = -1;
@@ -1235,22 +1230,19 @@ void openssl_crypto_cleanup(void)
 	CRYPTO_set_locking_callback(NULL);
 
 	for(i = 0; i < CRYPTO_num_locks(); i++) {
-		pthread_mutex_destroy(&(openssl_lock.lock[i]));
+		pthread_mutex_destroy(&openssl_lock[i]);
 	}
 
-	OPENSSL_free(openssl_lock.lock);
-	OPENSSL_free(openssl_lock.lock_count);
+	OPENSSL_free(openssl_lock);
 }
 
 void openssl_crypto_init(void)
 {
 	int i;
 
-	openssl_lock.lock = OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
-	openssl_lock.lock_count = OPENSSL_malloc(CRYPTO_num_locks() * sizeof(long));
+	openssl_lock = OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
 	for(i = 0; i < CRYPTO_num_locks(); i++) {
-		openssl_lock.lock_count[i] = 0;
-		pthread_mutex_init(&(openssl_lock.lock[i]), NULL);
+		pthread_mutex_init(&openssl_lock[i], NULL);
 	}
 
 	CRYPTO_THREADID_set_callback(openssl_thread_id);
@@ -1261,11 +1253,9 @@ void openssl_thread_cb(int mode, int type, const char UNUSED *file,
 		int UNUSED line)
 {
 	if(mode & CRYPTO_LOCK) {
-		pthread_mutex_lock(&(openssl_lock.lock[type]));
-		openssl_lock.lock_count[type]++;
+		pthread_mutex_lock(&openssl_lock[type]);
 	} else {
-		pthread_mutex_unlock(&(openssl_lock.lock[type]));
-		openssl_lock.lock_count[type]--;
+		pthread_mutex_unlock(&openssl_lock[type]);
 	}
 }
 
