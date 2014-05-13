@@ -2015,7 +2015,7 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*))
 		struct aurpkg_t *pkg = i->data;
 
 		/* don't print duplicates */
-		if(!prev || aurpkg_cmp(pkg, prev) != 0) {
+		if(!prev || aurpkg_cmpname(pkg, prev) != 0) {
 			printfn(pkg);
 		}
 		prev = pkg;
