@@ -2451,7 +2451,7 @@ void usage(void)
 	    "  -f, --force             overwrite existing files when downloading\n"
 	    "  -h, --help              display this help and exit\n"
 	    "      --ignore <pkg>      ignore a package upgrade (can be used more than once)\n"
-	    "      --ignorerepo <repo> ignore some or all binary repos\n"
+	    "      --ignorerepo[=repo] ignore some or all binary repos\n"
 	    "  -t, --target <dir>      specify an alternate download directory\n"
 	    "      --threads <num>     limit number of threads created\n"
 	    "      --timeout <num>     specify connection timeout in seconds\n"
