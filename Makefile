@@ -10,7 +10,7 @@ DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c
 PREFIX    ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
 
-CPPFLAGS  := -DCOWER_VERSION=\"$(VERSION)\" $(CPPFLAGS)
+CPPFLAGS  := -D_GNU_SOURCE -DCOWER_VERSION=\"$(VERSION)\" $(CPPFLAGS)
 CFLAGS    := -std=c99 -g -pedantic -Wall -Wextra -pthread $(CFLAGS)
 LDFLAGS   := -pthread $(LDFLAGS)
 LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto

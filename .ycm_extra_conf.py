@@ -10,6 +10,7 @@ flags = [
 '-Wextra',
 '-Werror',
 '-DNDEBUG',
+'-D_GNU_SOURCE',
 '-DUSE_CLANG_COMPLETER',
 '-std=c99',
 '-DCOWER_VERSION="1"',

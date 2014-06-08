@@ -25,7 +25,6 @@
  */
 
 /* glibc */
-#define _GNU_SOURCE
 #include <ctype.h>
 #include <errno.h>
 #include <fnmatch.h>
@@ -66,7 +65,7 @@
 
 #define AUR_BASE_URL          "https://aur.archlinux.org"
 #define AUR_PKG_URL_FORMAT    AUR_BASE_URL "/packages/"
-#define AUR_RPC_URL           AUR_BASE_URL "/rpc.php?type=%s&arg=%s"
+#define AUR_RPC_URL           AUR_BASE_URL "/rpc.php?type=%s&arg=%s&v=2"
 
 #define NC                    "\033[0m"
 #define BOLD                  "\033[1m"
@@ -140,6 +139,12 @@ enum {
 	KEY_VERSION,
 	KEY_QUERY_RESULTCOUNT,
 	KEY_QUERY_RESULTS,
+	KEY_DEPENDS,
+	KEY_OPTDEPENDS,
+	KEY_MAKEDEPENDS,
+	KEY_PROVIDES,
+	KEY_CONFLICTS,
+	KEY_REPLACES,
 };
 
 enum {
@@ -176,7 +181,6 @@ struct strings_t {
 
 struct aurpkg_t {
 	char *desc;
-	char *lic;
 	char *maint;
 	char *name;
 	char *url;
@@ -188,6 +192,7 @@ struct aurpkg_t {
 	int votes;
 	time_t firstsub;
 	time_t lastmod;
+	alpm_list_t *licenses;
 	alpm_list_t *conflicts;
 	alpm_list_t *depends;
 	alpm_list_t *makedepends;
@@ -198,6 +203,7 @@ struct aurpkg_t {
 
 struct yajl_parser_t {
 	alpm_list_t *pkglist;
+	alpm_list_t *container;
 	int resultcount;
 	struct aurpkg_t *aurpkg;
 	int key;
@@ -249,9 +255,11 @@ static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static int get_config_path(char *config_path, size_t pathlen);
 static void indentprint(const char*, int);
+static int json_end_array(void*);
 static int json_end_map(void*);
 static int json_integer(void *ctx, long long);
 static int json_map_key(void*, const unsigned char*, size_t);
+static int json_start_array(void*);
 static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
 static int keycmp(const void *v1, const void *v2);
@@ -344,8 +352,8 @@ static yajl_callbacks callbacks = {
 	json_start_map,   /* start_map */
 	json_map_key,     /* map_key */
 	json_end_map,     /* end_map */
-	NULL,             /* start_array */
-	NULL              /* end_array */
+	json_start_array, /* start_array */
+	json_end_array,   /* end_array */
 };
 
 static char const *digits = "0123456789";
@@ -358,20 +366,26 @@ static const char *aur_cat[] = { NULL, "None", "daemons", "devel", "editors",
 
 static const struct key_t json_keys[] = {
 	{ KEY_CATEGORY, "CategoryID" },
+	{ KEY_CONFLICTS, "Conflicts" },
+	{ KEY_DEPENDS, "Depends" },
 	{ KEY_DESCRIPTION, "Description" },
 	{ KEY_FIRSTSUB, "FirstSubmitted" },
 	{ KEY_ID, "ID" },
 	{ KEY_LASTMOD, "LastModified" },
 	{ KEY_LICENSE, "License" },
 	{ KEY_MAINTAINER, "Maintainer" },
+	{ KEY_MAKEDEPENDS, "MakeDepends" },
 	{ KEY_NAME, "Name" },
 	{ KEY_VOTES, "NumVotes" },
+	{ KEY_OPTDEPENDS, "OptDepends" },
 	{ KEY_OOD, "OutOfDate" },
+	{ KEY_PROVIDES, "Provides" },
+	{ KEY_REPLACES, "Replaces" },
 	{ KEY_URL, "URL" },
 	{ KEY_URLPATH, "URLPath" },
 	{ KEY_VERSION, "Version" },
 	{ KEY_QUERY_RESULTCOUNT, "resultcount" },
-	{ KEY_QUERY_RESULTS, "results" }
+	{ KEY_QUERY_RESULTS, "results" },
 };
 
 static struct strings_t colstr = {
@@ -629,7 +643,6 @@ void aurpkg_free_inner(struct aurpkg_t *pkg)
 	free(pkg->urlpath);
 	free(pkg->desc);
 	free(pkg->url);
-	free(pkg->lic);
 
 	/* free extended list info */
 	FREELIST(pkg->depends);
@@ -638,6 +651,7 @@ void aurpkg_free_inner(struct aurpkg_t *pkg)
 	FREELIST(pkg->provides);
 	FREELIST(pkg->conflicts);
 	FREELIST(pkg->replaces);
+	FREELIST(pkg->licenses);
 
 	memset(pkg, 0, sizeof(struct aurpkg_t));
 }
@@ -1067,6 +1081,43 @@ void indentprint(const char *str, int indent)
 	free(wcstr);
 }
 
+int json_start_array(void *ctx)
+{
+	struct yajl_parser_t *p = ctx;
+
+	p->container = NULL;
+
+	return 1;
+}
+
+int json_end_array(void *ctx)
+{
+	struct yajl_parser_t *p = ctx;
+
+	switch (p->key) {
+	case KEY_LICENSE:
+		p->aurpkg->licenses = p->container;
+		break;
+	case KEY_MAKEDEPENDS:
+		p->aurpkg->makedepends = p->container;
+		break;
+	case KEY_DEPENDS:
+		p->aurpkg->depends = p->container;
+		break;
+	case KEY_PROVIDES:
+		p->aurpkg->provides = p->container;
+		break;
+	case KEY_CONFLICTS:
+		p->aurpkg->conflicts = p->container;
+		break;
+	case KEY_OPTDEPENDS:
+		p->aurpkg->optdepends = p->container;
+		break;
+	}
+
+	return 1;
+}
+
 int json_end_map(void *ctx)
 {
 	struct yajl_parser_t *p = ctx;
@@ -1167,11 +1218,19 @@ int json_string(void *ctx, const unsigned char *data, size_t size)
 	case KEY_URLPATH:
 		key = &p->aurpkg->urlpath;
 		break;
-	case KEY_LICENSE:
-		key = &p->aurpkg->lic;
+	case KEY_MAKEDEPENDS:
+	case KEY_DEPENDS:
+	case KEY_OPTDEPENDS:
+	case KEY_PROVIDES:
+	case KEY_CONFLICTS:
+	case KEY_REPLACES:
+	case KEY_LICENSE: {
+		p->container = alpm_list_add(p->container, "");
+		key = (char **)&p->container->prev->data;
+	}
 		break;
 	default:
-		/* ignored other fields */
+		/* ignore other fields */
 		return 1;
 	}
 
@@ -1840,9 +1899,6 @@ void print_pkg_formatted(struct aurpkg_t *pkg)
 					snprintf(buf, 64, "%d", pkg->id);
 					printf(fmt, buf);
 					break;
-				case 'l':
-					printf(fmt, pkg->lic);
-					break;
 				case 'm':
 					printf(fmt, pkg->maint ? pkg->maint : "(orphan)");
 					break;
@@ -1888,6 +1944,9 @@ void print_pkg_formatted(struct aurpkg_t *pkg)
 					break;
 				case 'R':
 					print_extinfo_list(pkg->replaces, NULL, cfg.delim, 0);
+					break;
+				case 'l':
+					print_extinfo_list(pkg->licenses, NULL, cfg.delim, 0);
 					break;
 				case '%':
 					fputc('%', stdout);
@@ -1950,11 +2009,13 @@ void print_pkg_info(struct aurpkg_t *pkg)
 
 	print_extinfo_list(pkg->replaces, "Replaces", kListDelim, 1);
 
-	printf("Category       : %s\n"
-				 "License        : %s\n"
-				 "Votes          : %d\n"
+	printf("Category       : %s\n", category_id_to_string(pkg->cat));
+
+	print_extinfo_list(pkg->licenses, "License", kListDelim, 1);
+
+	printf("Votes          : %d\n"
 				 "Out of Date    : %s%s%s\n",
-				 category_id_to_string(pkg->cat), pkg->lic, pkg->votes,
+				 pkg->votes,
 				 pkg->ood ? colstr.ood : colstr.utd,
 				 pkg->ood ? "Yes" : "No", colstr.nc);
 
