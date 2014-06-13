@@ -142,10 +142,17 @@ typedef enum __pkgdetail_t {
 	PKGDETAIL_MAX
 } pkgdetail_t;
 
+enum json_key_type_t {
+	JSON_KEY_METADATA,
+	JSON_KEY_PACKAGE_ATTR,
+};
+typedef enum json_key_type_t json_key_type_t;
+
 struct key_t {
 	const char *name;
+	json_key_type_t type;
 	int multivalued;
-	ssize_t offset;
+	size_t offset;
 };
 
 struct strings_t {
@@ -168,6 +175,7 @@ struct aurpkg_t {
 	char *url;
 	char *urlpath;
 	char *ver;
+
 	int cat;
 	int id;
 	int pkgbaseid;
@@ -175,24 +183,30 @@ struct aurpkg_t {
 	int votes;
 	time_t firstsub;
 	time_t lastmod;
+
 	alpm_list_t *licenses;
 	alpm_list_t *conflicts;
 	alpm_list_t *depends;
 	alpm_list_t *groups;
 	alpm_list_t *makedepends;
 	alpm_list_t *optdepends;
+	alpm_list_t *checkdepends;
 	alpm_list_t *provides;
 	alpm_list_t *replaces;
 };
+typedef struct aurpkg_t aurpkg_t;
 
-struct yajl_parser_t {
-	alpm_list_t *pkglist;
-	int resultcount;
-	struct aurpkg_t aurpkg;
+struct json_parser_t {
 	const struct key_t *key;
-	int json_depth;
+	int depth;
+
+	int resultcount;
+	alpm_list_t *pkglist;
+	aurpkg_t aurpkg;
+
 	char *error;
 };
+typedef struct json_parser_t json_parser_t;
 
 struct response_t {
 	char *data;
@@ -201,7 +215,7 @@ struct response_t {
 
 struct task_t {
 	void *(*threadfn)(CURL*, void*);
-	void (*printfn)(struct aurpkg_t*);
+	void (*printfn)(aurpkg_t*);
 };
 
 /* function prototypes */
@@ -212,21 +226,20 @@ static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*, char**);
-static int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
-static int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2);
+static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmpood(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmplastmod(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmp(const void*, const void*);
-static struct aurpkg_t *aurpkg_dup(const struct aurpkg_t*);
+static aurpkg_t *aurpkg_dup(const aurpkg_t*);
 static void aurpkg_free(void*);
-static void aurpkg_free_inner(struct aurpkg_t*);
+static void aurpkg_free_inner(aurpkg_t*);
 static int globcompare(const void *a, const void *b);
 static const char *category_id_to_string(size_t id);
 static CURL *curl_init_easy_handle(CURL*);
-static char *curl_get_url_as_buffer(CURL*, const char*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
 static int cwr_asprintf(char**, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
@@ -239,6 +252,7 @@ static int getcols(void);
 static int get_config_path(char *config_path, size_t pathlen);
 static void indentprint(const char*, int);
 static int json_end_map(void*);
+static void *json_get_valueptr(json_parser_t *parser);
 static int json_integer(void *ctx, long long);
 static int json_map_key(void*, const unsigned char*, size_t);
 static int json_start_map(void*);
@@ -259,10 +273,10 @@ static int pkg_is_binary(const char *pkg);
 static void pkgbuild_get_extinfo(char*, alpm_list_t**[]);
 static int print_escaped(const char*);
 static void print_extinfo_list(alpm_list_t*, const char*, const char*, int);
-static void print_pkg_formatted(struct aurpkg_t*);
-static void print_pkg_info(struct aurpkg_t*);
-static void print_pkg_search(struct aurpkg_t*);
-static void print_results(alpm_list_t*, void (*)(struct aurpkg_t*));
+static void print_pkg_formatted(aurpkg_t*);
+static void print_pkg_info(aurpkg_t*);
+static void print_pkg_search(aurpkg_t*);
+static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static int resolve_dependencies(CURL*, const char*, const char*);
 static int set_working_dir(void);
@@ -273,7 +287,6 @@ static void *task_download(CURL*, void*);
 static void *task_query(CURL*, void*);
 static void *task_update(CURL*, void*);
 static void *thread_pool(void*);
-static char *url_escape(char*, int, const char*);
 static void usage(void);
 static void version(void);
 static size_t yajl_parse_stream(void*, size_t, size_t, void*);
@@ -290,7 +303,6 @@ static struct {
 	short color;
 	short ignoreood;
 	short sortorder;
-	int extinfo:1;
 	int force:1;
 	int getdeps:1;
 	int quiet:1;
@@ -299,7 +311,7 @@ static struct {
 	int maxthreads;
 	long timeout;
 
-	int (*sort_fn) (const struct aurpkg_t*, const struct aurpkg_t*);
+	int (*sort_fn) (const aurpkg_t*, const aurpkg_t*);
 
 	alpm_list_t *targets;
 	struct {
@@ -348,34 +360,33 @@ static const char *aur_cat[] = { NULL, "None", "daemons", "devel", "editors",
                                 "science", "system", "x11", "xfce", "kernels", "fonts" };
 
 /* list must be sorted by the string value */
-#define AURPKG_OFFSETOF(field) offsetof(struct aurpkg_t, field)
 static const struct key_t json_keys[] = {
-	{ "CategoryID",     0, AURPKG_OFFSETOF(cat) },
-	{ "Conflicts",      1, AURPKG_OFFSETOF(conflicts) },
-	{ "Depends",        1, AURPKG_OFFSETOF(depends) },
-	{ "Description",    0, AURPKG_OFFSETOF(desc) },
-	{ "FirstSubmitted", 0, AURPKG_OFFSETOF(firstsub) },
-	{ "Groups",         1, AURPKG_OFFSETOF(groups) },
-	{ "ID",             0, AURPKG_OFFSETOF(id) },
-	{ "LastModified",   0, AURPKG_OFFSETOF(lastmod) },
-	{ "License",        1, AURPKG_OFFSETOF(licenses) },
-	{ "Maintainer",     0, AURPKG_OFFSETOF(maint) },
-	{ "MakeDepends",    1, AURPKG_OFFSETOF(makedepends) },
-	{ "Name",           0, AURPKG_OFFSETOF(name) },
-	{ "NumVotes",       0, AURPKG_OFFSETOF(votes) },
-	{ "OptDepends",     1, AURPKG_OFFSETOF(optdepends) },
-	{ "OutOfDate",      0, AURPKG_OFFSETOF(ood) },
-	{ "PackageBase",    0, AURPKG_OFFSETOF(pkgbase) },
-	{ "PackageBaseID",  0, AURPKG_OFFSETOF(pkgbaseid) },
-	{ "Provides",       1, AURPKG_OFFSETOF(provides) },
-	{ "Replaces",       1, AURPKG_OFFSETOF(replaces) },
-	{ "URL",            0, AURPKG_OFFSETOF(url) },
-	{ "URLPath",        0, AURPKG_OFFSETOF(urlpath) },
-	{ "Version",        0, AURPKG_OFFSETOF(ver) },
-	{ "resultcount",    0, -1 },
-	{ "results",        0, -1 },
+	{ "CategoryID",     JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, cat) },
+	{ "CheckDepends",   JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, checkdepends) },
+	{ "Conflicts",      JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, conflicts) },
+	{ "Depends",        JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, depends) },
+	{ "Description",    JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, desc) },
+	{ "FirstSubmitted", JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, firstsub) },
+	{ "Groups",         JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, groups) },
+	{ "ID",             JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, id) },
+	{ "LastModified",   JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, lastmod) },
+	{ "License",        JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, licenses) },
+	{ "Maintainer",     JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, maint) },
+	{ "MakeDepends",    JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, makedepends) },
+	{ "Name",           JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, name) },
+	{ "NumVotes",       JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, votes) },
+	{ "OptDepends",     JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, optdepends) },
+	{ "OutOfDate",      JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, ood) },
+	{ "PackageBase",    JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, pkgbase) },
+	{ "PackageBaseID",  JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, pkgbaseid) },
+	{ "Provides",       JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, provides) },
+	{ "Replaces",       JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, replaces) },
+	{ "URL",            JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, url) },
+	{ "URLPath",        JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, urlpath) },
+	{ "Version",        JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, ver) },
+	{ "resultcount",    JSON_KEY_METADATA, 0, offsetof(json_parser_t, resultcount) },
+	{ "results",        JSON_KEY_METADATA, 0, 0 },
 };
-#undef AURPKG_OFFSETOF
 
 static struct strings_t colstr = {
 	.error = "error:",
@@ -566,46 +577,46 @@ int archive_extract_file(const struct response_t *file, char **subdir)
 
 int aurpkg_cmp(const void *p1, const void *p2)
 {
-	const struct aurpkg_t *pkg1 = p1;
-	const struct aurpkg_t *pkg2 = p2;
+	const aurpkg_t *pkg1 = p1;
+	const aurpkg_t *pkg2 = p2;
 
 	return cfg.sortorder * (cfg.sort_fn)(pkg1, pkg2);
 }
 
-int aurpkg_cmpname(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return strcmp(pkg1->name, pkg2->name);
 }
 
-int aurpkg_cmpver(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return alpm_pkg_vercmp(pkg1->ver, pkg2->ver);
 }
 
-int aurpkg_cmpmaint(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return strcmp(pkg1->maint, pkg2->maint);
 }
 
-int aurpkg_cmpvotes(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return pkg1->votes - pkg2->votes;
 }
 
-int aurpkg_cmpood(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmpood(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return pkg1->ood - pkg2->ood;
 }
 
-int aurpkg_cmplastmod(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmplastmod(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return difftime(pkg1->lastmod, pkg2->lastmod);
 }
 
-int aurpkg_cmpfirstsub(const struct aurpkg_t *pkg1, const struct aurpkg_t *pkg2) {
+int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return difftime(pkg1->firstsub, pkg2->firstsub);
 }
 
-struct aurpkg_t *aurpkg_dup(const struct aurpkg_t *pkg)
+aurpkg_t *aurpkg_dup(const aurpkg_t *pkg)
 {
-	struct aurpkg_t *newpkg;
+	aurpkg_t *newpkg;
 
-	newpkg = malloc(sizeof(struct aurpkg_t));
-	return newpkg ? memcpy(newpkg, pkg, sizeof(struct aurpkg_t)) : NULL;
+	newpkg = malloc(sizeof(aurpkg_t));
+	return newpkg ? memcpy(newpkg, pkg, sizeof(aurpkg_t)) : NULL;
 }
 
 void aurpkg_free(void *pkg)
@@ -619,7 +630,7 @@ int globcompare(const void *a, const void *b)
 	return fnmatch(a, b, 0);
 }
 
-void aurpkg_free_inner(struct aurpkg_t *pkg)
+void aurpkg_free_inner(aurpkg_t *pkg)
 {
 	if(!pkg) {
 		return;
@@ -637,6 +648,7 @@ void aurpkg_free_inner(struct aurpkg_t *pkg)
 	/* free extended list info */
 	FREELIST(pkg->depends);
 	FREELIST(pkg->groups);
+	FREELIST(pkg->checkdepends);
 	FREELIST(pkg->makedepends);
 	FREELIST(pkg->optdepends);
 	FREELIST(pkg->provides);
@@ -644,7 +656,7 @@ void aurpkg_free_inner(struct aurpkg_t *pkg)
 	FREELIST(pkg->replaces);
 	FREELIST(pkg->licenses);
 
-	memset(pkg, 0, sizeof(struct aurpkg_t));
+	memset(pkg, 0, sizeof(aurpkg_t));
 }
 
 const char *category_id_to_string(size_t id)
@@ -751,35 +763,6 @@ CURL *curl_init_easy_handle(CURL *handle)
 	return handle;
 }
 
-char *curl_get_url_as_buffer(CURL *curl, const char *url)
-{
-	long httpcode;
-	struct response_t response = { NULL, 0 };
-	CURLcode curlstat;
-
-	curl = curl_init_easy_handle(curl);
-	curl_easy_setopt(curl, CURLOPT_URL, url);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-	cwr_printf(LOG_DEBUG, "get_url_as_buffer: curl_easy_perform %s\n", url);
-	curlstat = curl_easy_perform(curl);
-	if(curlstat != CURLE_OK) {
-		cwr_fprintf(stderr, LOG_ERROR, "%s: %s\n", url, curl_easy_strerror(curlstat));
-		goto finish;
-	}
-
-	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
-	cwr_printf(LOG_DEBUG, "get_url_as_buffer: %s: server responded with %ld\n", url, httpcode);
-	if(httpcode >= 400) {
-		cwr_fprintf(stderr, LOG_ERROR, "%s: server responded with HTTP %ld\n",
-				url, httpcode);
-	}
-
-finish:
-	return response.data;
-}
-
 size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	void *newdata;
@@ -804,9 +787,9 @@ size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream)
 void *download(CURL *curl, void *arg)
 {
 	alpm_list_t *queryresult = NULL;
-	struct aurpkg_t *result;
+	aurpkg_t *result;
 	CURLcode curlstat;
-	char *url, *escaped, *subdir = NULL;
+	char *url, *subdir = NULL;
 	int ret;
 	long httpcode;
 	struct response_t response = { 0, 0 };
@@ -834,10 +817,8 @@ void *download(CURL *curl, void *arg)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 
 	result = queryresult->data;
-	escaped = url_escape(result->urlpath, 0, "/");
-	cwr_asprintf(&url, AUR_BASE_URL "%s", escaped);
+	cwr_asprintf(&url, AUR_BASE_URL "%s", result->urlpath);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
-	free(escaped);
 
 	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char*)arg, url);
 	curlstat = curl_easy_perform(curl);
@@ -901,7 +882,7 @@ alpm_list_t *filter_results(alpm_list_t *list)
 
 		if(regcomp(&regex, targ, kRegexOpts) == 0) {
 			for(j = list; j; j = alpm_list_next(j)) {
-				struct aurpkg_t *pkg = j->data;
+				aurpkg_t *pkg = j->data;
 				const char *name = pkg->name;
 				const char *desc = pkg->desc;
 
@@ -1074,10 +1055,10 @@ void indentprint(const char *str, int indent)
 
 int json_end_map(void *ctx)
 {
-	struct yajl_parser_t *p = ctx;
+	json_parser_t *p = ctx;
 
-	p->json_depth--;
-	if(p->json_depth > 0) {
+	p->depth--;
+	if(p->depth > 0) {
 		if(!(p->aurpkg.ood && cfg.ignoreood)) {
 			p->pkglist = alpm_list_add_sorted(p->pkglist, aurpkg_dup(&p->aurpkg), aurpkg_cmp);
 		} else {
@@ -1088,24 +1069,44 @@ int json_end_map(void *ctx)
 	return 1;
 }
 
+void *json_get_valueptr(json_parser_t *parser)
+{
+	uint8_t *addr;
+
+	if(parser->key == NULL) {
+		return NULL;
+	}
+
+	switch(parser->key->type) {
+	case JSON_KEY_METADATA:
+		addr = (uint8_t*)parser;
+		break;
+	case JSON_KEY_PACKAGE_ATTR:
+		addr = (uint8_t*)&parser->aurpkg;
+		break;
+	}
+
+	return addr + parser->key->offset;
+}
+
 int json_integer(void *ctx, long long val)
 {
-	struct yajl_parser_t *p = ctx;
-	int *dest;
+	json_parser_t *p = ctx;
+	int *valueptr;
 
-	if(p->key == NULL) {
+	valueptr = json_get_valueptr(p);
+	if(valueptr == NULL) {
 		return 1;
 	}
 
-	dest = (int *)((uint8_t*)&p->aurpkg + p->key->offset);
-	*dest = val;
+	*valueptr = val;
 
 	return 1;
 }
 
 int json_map_key(void *ctx, const unsigned char *data, size_t size)
 {
-	struct yajl_parser_t *p = ctx;
+	json_parser_t *p = ctx;
 
 	p->key = string_to_key(data, size);
 
@@ -1114,11 +1115,11 @@ int json_map_key(void *ctx, const unsigned char *data, size_t size)
 
 int json_start_map(void *ctx)
 {
-	struct yajl_parser_t *p = ctx;
+	json_parser_t *p = ctx;
 
-	p->json_depth++;
-	if(p->json_depth > 1) {
-		memset(&p->aurpkg, 0, sizeof(struct aurpkg_t));
+	p->depth++;
+	if(p->depth > 1) {
+		memset(&p->aurpkg, 0, sizeof(aurpkg_t));
 	}
 
 	return 1;
@@ -1126,29 +1127,25 @@ int json_start_map(void *ctx)
 
 int json_string(void *ctx, const unsigned char *data, size_t size)
 {
-	struct yajl_parser_t *p = ctx;
-	void *key;
+	json_parser_t *p = ctx;
+	void *valueptr;
 
-	if(p->key == NULL) {
+	valueptr = json_get_valueptr(p);
+	if(valueptr == NULL) {
 		return 1;
 	}
 
-	if(p->key->offset >= 0) {
-		key = (uint8_t*)&p->aurpkg + p->key->offset;
-	} else {
-		/* FIXME: this was the last remaining use of the key enum/field. */
-		if(streq(p->key->name, "results")) {
-			key = &p->error;
-		} else {
-			/* key is ignored */
-			return 1;
-		}
+	/* hacky -- the AUR violates its own response structure by substituting a map
+	 * for a string when type=error. */
+	if(p->key->type == JSON_KEY_METADATA && streq(p->key->name, "results")) {
+		p->error = strndup((const char*)data, size);
+		return 0;
 	}
 
 	if(p->key->multivalued) {
-		return json_string_multivalued(key, data, size);
+		return json_string_multivalued(valueptr, data, size);
 	} else {
-		return json_string_singlevalued(key, data, size);
+		return json_string_singlevalued(valueptr, data, size);
 	}
 }
 
@@ -1158,6 +1155,9 @@ int json_string_multivalued(alpm_list_t **dest, const unsigned char *data,
 	char *str;
 
 	str = strndup((const char *)data, size);
+	if(str == NULL) {
+		return 0;
+	}
 
 	*dest = alpm_list_add(*dest, str);
 
@@ -1170,7 +1170,11 @@ int json_string_singlevalued(char **dest, const unsigned char *data,
 	char *str;
 
 	str = strndup((const char *)data, size);
+	if(str == NULL) {
+		return 0;
+	}
 
+	free(*dest);
 	*dest = str;
 
 	return 1;
@@ -1487,11 +1491,7 @@ int parse_options(int argc, char *argv[])
 				cfg.opmask |= OP_UPDATE;
 				break;
 			case 'i':
-				if(!(cfg.opmask & OP_INFO)) {
-					cfg.opmask |= OP_INFO;
-				} else {
-					cfg.extinfo |= 1;
-				}
+				cfg.opmask |= OP_INFO;
 				break;
 			case 'd':
 				if(!(cfg.opmask & OP_DOWNLOAD)) {
@@ -1802,7 +1802,7 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 	}
 }
 
-void print_pkg_formatted(struct aurpkg_t *pkg)
+void print_pkg_formatted(aurpkg_t *pkg)
 {
 	const char *p;
 	char fmt[32], buf[64];
@@ -1902,7 +1902,7 @@ void print_pkg_formatted(struct aurpkg_t *pkg)
 	return;
 }
 
-void print_pkg_info(struct aurpkg_t *pkg)
+void print_pkg_info(aurpkg_t *pkg)
 {
 	char datestring[42];
 	struct tm *ts;
@@ -1920,7 +1920,7 @@ void print_pkg_info(struct aurpkg_t *pkg)
 		printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
 	}
 	fputc('\n', stdout);
-	if(streq(pkg->name, pkg->pkgbase)) {
+	if(!streq(pkg->name, pkg->pkgbase)) {
 		printf("PackageBase    : %s%s%s\n", colstr.pkg, pkg->pkgbase, colstr.nc);
 	}
 
@@ -1932,6 +1932,7 @@ void print_pkg_info(struct aurpkg_t *pkg)
 
 	print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
 	print_extinfo_list(pkg->makedepends, "Makedepends", kListDelim, 1);
+	print_extinfo_list(pkg->checkdepends, "Checkdepends", kListDelim, 1);
 	print_extinfo_list(pkg->provides, "Provides", kListDelim, 1);
 	print_extinfo_list(pkg->conflicts, "Conflicts With", kListDelim, 1);
 
@@ -1970,7 +1971,7 @@ void print_pkg_info(struct aurpkg_t *pkg)
 	printf("\n\n");
 }
 
-void print_pkg_search(struct aurpkg_t *pkg)
+void print_pkg_search(aurpkg_t *pkg)
 {
 	if(cfg.quiet) {
 		printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
@@ -1994,10 +1995,10 @@ void print_pkg_search(struct aurpkg_t *pkg)
 	}
 }
 
-void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*))
+void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 {
 	const alpm_list_t *i;
-	struct aurpkg_t *prev = NULL;
+	aurpkg_t *prev = NULL;
 
 	if(!printfn) {
 		return;
@@ -2009,7 +2010,7 @@ void print_results(alpm_list_t *results, void (*printfn)(struct aurpkg_t*))
 	}
 
 	for(i = results; i; i = alpm_list_next(i)) {
-		struct aurpkg_t *pkg = i->data;
+		aurpkg_t *pkg = i->data;
 
 		/* don't print duplicates */
 		if(!prev || aurpkg_cmpname(pkg, prev) != 0) {
@@ -2136,7 +2137,7 @@ int strings_init(void)
 
 	/* guard against delim being something other than kListDelim if extinfo
 	 * and format aren't provided */
-	cfg.delim = (cfg.extinfo && cfg.format) ? cfg.delim : kListDelim;
+	cfg.delim = cfg.format ? cfg.delim : kListDelim;
 
 	return 0;
 }
@@ -2196,10 +2197,10 @@ void *task_query(CURL *curl, void *arg)
 	CURLcode curlstat;
 	struct yajl_handle_t *yajl_hand = NULL;
 	const char *argstr;
-	char *escaped, *url;
+	_cleanup_free_ char *escaped = NULL, *url = NULL;
 	long httpcode;
 	int span = 0;
-	struct yajl_parser_t *parse_struct;
+	json_parser_t json_parser;
 
 	/* find a valid chunk of search string */
 	if(cfg.opmask & OP_SEARCH) {
@@ -2234,14 +2235,14 @@ void *task_query(CURL *curl, void *arg)
 		argstr = arg;
 	}
 
-	parse_struct = calloc(1, sizeof(struct yajl_parser_t));
-	yajl_hand = yajl_alloc(&callbacks, NULL, (void*)parse_struct);
+	memset(&json_parser, 0, sizeof(json_parser_t));
+	yajl_hand = yajl_alloc(&callbacks, NULL, &json_parser);
 
 	curl = curl_init_easy_handle(curl);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, yajl_parse_stream);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, yajl_hand);
 
-	escaped = url_escape((char*)argstr, span, NULL);
+	escaped = curl_easy_escape(NULL, argstr, span);
 	if(cfg.opmask & OP_SEARCH) {
 		cwr_asprintf(&url, AUR_RPC_URL, "search", escaped);
 	} else if(cfg.opmask & OP_MSEARCH) {
@@ -2269,41 +2270,16 @@ void *task_query(CURL *curl, void *arg)
 	}
 
 	yajl_complete_parse(yajl_hand);
-	if(parse_struct->error) {
+	if(json_parser.error) {
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: query failed: %s\n",
-				(const char*)arg, parse_struct->error);
+				(const char*)arg, json_parser.error);
 		goto finish;
 	}
 
-	pkglist = parse_struct->pkglist;
-
-	if(pkglist && cfg.extinfo) {
-		struct aurpkg_t *aurpkg;
-		char *pburl, *escaped, *pkgbuild;
-
-		aurpkg = pkglist->data;
-		escaped = url_escape(aurpkg->urlpath, 0, "/");
-		cwr_asprintf(&pburl, AUR_BASE_URL "%s", escaped);
-		memcpy(strrchr(pburl, '/') + 1, "PKGBUILD\0", 9);
-
-		pkgbuild = curl_get_url_as_buffer(curl, pburl);
-		free(escaped);
-		free(pburl);
-
-		alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
-			&aurpkg->depends, &aurpkg->makedepends, &aurpkg->optdepends,
-			&aurpkg->provides, &aurpkg->conflicts, &aurpkg->replaces
-		};
-
-		pkgbuild_get_extinfo(pkgbuild, pkg_details);
-		free(pkgbuild);
-	}
+	pkglist = json_parser.pkglist;
 
 finish:
 	yajl_free(yajl_hand);
-	curl_free(escaped);
-	free(parse_struct);
-	free(url);
 
 	return pkglist;
 }
@@ -2311,7 +2287,7 @@ finish:
 void *task_update(CURL *curl, void *arg)
 {
 	alpm_pkg_t *pmpkg;
-	struct aurpkg_t *aurpkg;
+	aurpkg_t *aurpkg;
 	void *dlretval, *qretval;
 	const char *candidate = arg;
 
@@ -2402,24 +2378,6 @@ void *thread_pool(void *arg)
 	curl_easy_cleanup(curl);
 
 	return ret;
-}
-
-static char *url_escape(char *in, int len, const char *delim)
-{
-	char *tok;
-	char buf[2048] = { 0 };
-
-	if(!delim) {
-		return curl_easy_escape(NULL, in, len);
-	}
-
-	while((tok = strsep(&in, delim))) {
-		_cleanup_free_ char *escaped = curl_easy_escape(NULL, tok, 0);
-		strcat(buf, escaped);
-		strcat(buf, delim);
-	}
-
-	return strdup(buf);
 }
 
 void usage(void)
