@@ -278,7 +278,8 @@ static void print_pkg_info(aurpkg_t*);
 static void print_pkg_search(aurpkg_t*);
 static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
-static int resolve_dependencies(CURL*, const char*, const char*);
+static int resolve_dependencies(CURL*, aurpkg_t*);
+static void resolve_one_dep(CURL *curl, const char *depend);
 static int set_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
@@ -855,7 +856,7 @@ void *download(CURL *curl, void *arg)
 			colstr.pkg, result->name, colstr.nc, cfg.dlpath);
 
 	if(cfg.getdeps) {
-		resolve_dependencies(curl, arg, subdir);
+		resolve_dependencies(curl, result);
 	}
 
 finish:
@@ -2020,64 +2021,57 @@ void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 	}
 }
 
-int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir)
+void resolve_one_dep(CURL *curl, const char *depend)
+{
+	char *sanitized = NULL;
+	int aur_satisfied, alpm_satisfied;
+
+	sanitized = strdup(depend);
+	sanitized[strcspn(sanitized, "<>=")] = '\0';
+
+	pthread_mutex_lock(&listlock);
+	aur_satisfied = alpm_list_find_str(cfg.targets, sanitized) != NULL;
+	if(!aur_satisfied) {
+		cfg.targets = alpm_list_add(cfg.targets, sanitized);
+	}
+	pthread_mutex_unlock(&listlock);
+
+	alpm_satisfied = 0; // alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend) != NULL;
+
+	if(aur_satisfied) {
+		/* this is something of a saving grace for the --brief API. if we've
+		 * already tried the AUR but pacman doesn't agree, emit the dep as
+		 * unresolvable. */
+		if(cfg.logmask & LOG_BRIEF && !alpm_satisfied) {
+			cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
+		}
+	}
+
+	if(alpm_satisfied) {
+		cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
+		return;
+	}
+
+	{
+		void *retval;
+
+		retval = task_download(curl, sanitized);
+		alpm_list_free_inner(retval, aurpkg_free);
+		alpm_list_free(retval);
+	}
+}
+
+int resolve_dependencies(CURL *curl, aurpkg_t *pkg)
 {
 	const alpm_list_t *i;
-	alpm_list_t *deplist = NULL;
-	char *filename, *pkgbuild;
-	void *retval;
 
-	curl = curl_init_easy_handle(curl);
-
-	cwr_asprintf(&filename, "%s/%s/PKGBUILD", cfg.dlpath, subdir ? subdir : pkgname);
-
-	pkgbuild = get_file_as_buffer(filename);
-	if(!pkgbuild) {
-		return 1;
+	for(i = pkg->makedepends; i; i = i->next) {
+		resolve_one_dep(curl, i->data);
 	}
 
-	alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
-		&deplist, &deplist, NULL, NULL, NULL, NULL
-	};
-
-	cwr_printf(LOG_DEBUG, "Parsing %s for extended info\n", filename);
-	pkgbuild_get_extinfo(pkgbuild, pkg_details);
-	free(pkgbuild);
-	free(filename);
-
-	for(i = deplist; i; i = alpm_list_next(i)) {
-		const char *depend = i->data;
-		char *sanitized = strdup(depend);
-
-		sanitized[strcspn(sanitized, "<>=")] = '\0';
-
-		if(!alpm_list_find_str(cfg.targets, sanitized)) {
-			pthread_mutex_lock(&listlock);
-			cfg.targets = alpm_list_add(cfg.targets, sanitized);
-			pthread_mutex_unlock(&listlock);
-		} else {
-			if(cfg.logmask & LOG_BRIEF &&
-							!alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-					cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
-			}
-			free(sanitized);
-			sanitized = NULL;
-		}
-
-		if(sanitized) {
-			if(alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-				cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
-			} else {
-				if(!pkg_is_binary(depend)) {
-					retval = task_download(curl, sanitized);
-					alpm_list_free_inner(retval, aurpkg_free);
-					alpm_list_free(retval);
-				}
-			}
-		}
+	for(i = pkg->depends; i; i = i->next) {
+		resolve_one_dep(curl, i->data);
 	}
-
-	FREELIST(deplist);
 
 	return 0;
 }
@@ -2287,15 +2281,16 @@ finish:
 void *task_update(CURL *curl, void *arg)
 {
 	alpm_pkg_t *pmpkg;
+	alpm_list_t *qretval;
 	aurpkg_t *aurpkg;
-	void *dlretval, *qretval;
+	void *dlretval;
 	const char *candidate = arg;
 
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
 			colstr.pkg, candidate, colstr.nc);
 
 	qretval = task_query(curl, arg);
-	aurpkg = qretval ? ((alpm_list_t*)qretval)->data : NULL;
+	aurpkg = qretval ? qretval->data : NULL;
 	if(aurpkg) {
 
 		pmpkg = alpm_db_get_pkg(db_local, arg);
