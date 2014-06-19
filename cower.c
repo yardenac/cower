@@ -1194,17 +1194,14 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files)
 	alpm_list_t *i, *targets = NULL, *results = NULL;
 
 	for(i = files; i; i = i->next) {
-		alpm_list_t *depends = NULL;
 		char *pkgbuild = get_file_as_buffer(i->data);
 
 		alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
-			&depends, &depends, NULL, NULL, NULL
+			&results, &results, NULL, NULL, NULL
 		};
 
 		pkgbuild_get_extinfo(pkgbuild, pkg_details);
 		free(pkgbuild);
-
-		results = alpm_list_join(results, depends);
 	}
 
 	/* sanitize and dedupe */
