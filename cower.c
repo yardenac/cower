@@ -132,16 +132,6 @@ enum {
 	SORT_REVERSE = -1
 };
 
-typedef enum __pkgdetail_t {
-	PKGDETAIL_DEPENDS = 0,
-	PKGDETAIL_MAKEDEPENDS,
-	PKGDETAIL_OPTDEPENDS,
-	PKGDETAIL_PROVIDES,
-	PKGDETAIL_CONFLICTS,
-	PKGDETAIL_REPLACES,
-	PKGDETAIL_MAX
-} pkgdetail_t;
-
 enum json_key_type_t {
 	JSON_KEY_METADATA,
 	JSON_KEY_PACKAGE_ATTR,
@@ -265,12 +255,12 @@ static void openssl_crypto_cleanup(void);
 static void openssl_crypto_init(void);
 static void openssl_thread_id(CRYPTO_THREADID *id);
 static void openssl_thread_cb(int, int, const char*, int);
-static alpm_list_t *parse_bash_array(alpm_list_t*, char*, pkgdetail_t);
+static alpm_list_t *parse_bash_array(alpm_list_t*, char*);
 static int parse_configfile(void);
 static int parse_options(int, char*[]);
 static int parse_keyname(char*);
 static int pkg_is_binary(const char *pkg);
-static void pkgbuild_get_extinfo(char*, alpm_list_t**[]);
+static void pkgbuild_get_depends(char*, alpm_list_t**);
 static int print_escaped(const char*);
 static void print_extinfo_list(alpm_list_t*, const char*, const char*, int);
 static void print_pkg_formatted(aurpkg_t*);
@@ -1196,11 +1186,7 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files)
 	for(i = files; i; i = i->next) {
 		char *pkgbuild = get_file_as_buffer(i->data);
 
-		alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
-			&results, &results, NULL, NULL, NULL
-		};
-
-		pkgbuild_get_extinfo(pkgbuild, pkg_details);
+		pkgbuild_get_depends(pkgbuild, &results);
 		free(pkgbuild);
 	}
 
@@ -1258,36 +1244,12 @@ void openssl_thread_id(CRYPTO_THREADID *id)
 	CRYPTO_THREADID_set_numeric(id, pthread_self());
 }
 
-alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array, pkgdetail_t type)
+alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array)
 {
 	char *ptr, *token, *saveptr;
 
 	if(!array) {
 		return NULL;
-	}
-
-	if(type == PKGDETAIL_OPTDEPENDS) {
-		const char *arrayend = rawmemchr(array, '\0');
-		for(token = array; token <= arrayend; token++) {
-			if(*token == '\'' || *token == '\"') {
-				token++;
-				ptr = memchr(token, *(token - 1), arrayend - token);
-				*ptr = '\0';
-			} else if(isalpha(*token)) {
-				ptr = token;
-				while(!isspace(*++ptr));
-				*(ptr - 1) = '\0';
-			} else {
-				continue;
-			}
-
-			strtrim(token);
-			cwr_printf(LOG_DEBUG, "adding depend: %s\n", token);
-			deplist = alpm_list_add(deplist, strdup(token));
-
-			token = ptr;
-		}
-		return deplist;
 	}
 
 	for(token = strtok_r(array, " \t\n", &saveptr); token;
@@ -1670,14 +1632,13 @@ int pkg_is_binary(const char *pkg)
 	return 0;
 }
 
-void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[])
+void pkgbuild_get_depends(char *pkgbuild, alpm_list_t **deplist)
 {
 	char *lineptr;
 
 	for(lineptr = pkgbuild; lineptr; lineptr = strchr(lineptr, '\n')) {
-		char *arrayend;
-		int depth = 1, type = 0;
-		alpm_list_t **deplist;
+		char *arrayend, *arrayptr;
+		int depth = 1;
 		size_t linelen;
 
 		linelen = strtrim(++lineptr);
@@ -1685,39 +1646,25 @@ void pkgbuild_get_extinfo(char *pkgbuild, alpm_list_t **details[])
 			continue;
 		}
 
-		if(startswith(lineptr, "depends=(")) {
-			deplist = details[PKGDETAIL_DEPENDS];
-		} else if(startswith(lineptr, "makedepends=(")) {
-			deplist = details[PKGDETAIL_MAKEDEPENDS];
-		} else if(startswith(lineptr, "optdepends=(")) {
-			deplist = details[PKGDETAIL_OPTDEPENDS];
-			type = PKGDETAIL_OPTDEPENDS;
-		} else if(startswith(lineptr, "provides=(")) {
-			deplist = details[PKGDETAIL_PROVIDES];
-		} else if(startswith(lineptr, "replaces=(")) {
-			deplist = details[PKGDETAIL_REPLACES];
-		} else if(startswith(lineptr, "conflicts=(")) {
-			deplist = details[PKGDETAIL_CONFLICTS];
-		} else {
+		if(!startswith(lineptr, "depends=(") &&
+			!startswith(lineptr, "makedepends=(")) {
 			continue;
 		}
 
-		if(deplist) {
-			char *arrayptr = (char*)memchr(lineptr, '(', linelen) + 1;
-			for(arrayend = arrayptr; depth; arrayend++) {
-				switch(*arrayend) {
-					case ')':
-						depth--;
-						break;
-					case '(':
-						depth++;
-						break;
-				}
+		arrayptr = (char*)memchr(lineptr, '(', linelen) + 1;
+		for(arrayend = arrayptr; depth; arrayend++) {
+			switch(*arrayend) {
+				case ')':
+					depth--;
+					break;
+				case '(':
+					depth++;
+					break;
 			}
-			*(arrayend - 1) = '\0';
-			*deplist = parse_bash_array(*deplist, arrayptr, type);
-			lineptr = arrayend;
 		}
+		*(arrayend - 1) = '\0';
+		*deplist = parse_bash_array(*deplist, arrayptr);
+		lineptr = arrayend;
 	}
 }
 
