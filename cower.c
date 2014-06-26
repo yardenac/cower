@@ -278,7 +278,8 @@ static void print_pkg_info(aurpkg_t*);
 static void print_pkg_search(aurpkg_t*);
 static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
-static int resolve_dependencies(CURL*, const char*, const char*);
+static void resolve_one_dep(CURL *curl, const char *depend);
+static int resolve_pkg_dependencies(CURL*, aurpkg_t *package);
 static int set_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
@@ -855,7 +856,7 @@ void *download(CURL *curl, void *arg)
 			colstr.pkg, result->name, colstr.nc, cfg.dlpath);
 
 	if(cfg.getdeps) {
-		resolve_dependencies(curl, arg, subdir);
+		resolve_pkg_dependencies(curl, result);
 	}
 
 finish:
@@ -2017,64 +2018,51 @@ void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 	}
 }
 
-int resolve_dependencies(CURL *curl, const char *pkgname, const char *subdir)
-{
-	const alpm_list_t *i;
-	alpm_list_t *deplist = NULL;
-	char *filename, *pkgbuild;
-	void *retval;
+void resolve_one_dep(CURL *curl, const char *depend) {
+	char *sanitized = strdup(depend);
 
-	curl = curl_init_easy_handle(curl);
+	sanitized[strcspn(sanitized, "<>=")] = '\0';
 
-	cwr_asprintf(&filename, "%s/%s/PKGBUILD", cfg.dlpath, subdir ? subdir : pkgname);
-
-	pkgbuild = get_file_as_buffer(filename);
-	if(!pkgbuild) {
-		return 1;
+	if(!alpm_list_find_str(cfg.targets, sanitized)) {
+		pthread_mutex_lock(&listlock);
+		cfg.targets = alpm_list_add(cfg.targets, sanitized);
+		pthread_mutex_unlock(&listlock);
+	} else {
+		if(cfg.logmask & LOG_BRIEF &&
+						!alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
+				cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
+		}
+		free(sanitized);
+		return;
 	}
 
-	alpm_list_t **pkg_details[PKGDETAIL_MAX] = {
-		&deplist, &deplist, NULL, NULL, NULL, NULL
-	};
-
-	cwr_printf(LOG_DEBUG, "Parsing %s for extended info\n", filename);
-	pkgbuild_get_extinfo(pkgbuild, pkg_details);
-	free(pkgbuild);
-	free(filename);
-
-	for(i = deplist; i; i = alpm_list_next(i)) {
-		const char *depend = i->data;
-		char *sanitized = strdup(depend);
-
-		sanitized[strcspn(sanitized, "<>=")] = '\0';
-
-		if(!alpm_list_find_str(cfg.targets, sanitized)) {
-			pthread_mutex_lock(&listlock);
-			cfg.targets = alpm_list_add(cfg.targets, sanitized);
-			pthread_mutex_unlock(&listlock);
+	if(sanitized) {
+		if(alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
+			cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
 		} else {
-			if(cfg.logmask & LOG_BRIEF &&
-							!alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-					cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
-			}
-			free(sanitized);
-			sanitized = NULL;
-		}
+			if(!pkg_is_binary(depend)) {
+				void *retval;
 
-		if(sanitized) {
-			if(alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-				cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
-			} else {
-				if(!pkg_is_binary(depend)) {
-					retval = task_download(curl, sanitized);
-					alpm_list_free_inner(retval, aurpkg_free);
-					alpm_list_free(retval);
-				}
+				retval = task_download(curl, sanitized);
+				alpm_list_free_inner(retval, aurpkg_free);
+				alpm_list_free(retval);
 			}
 		}
 	}
 
-	FREELIST(deplist);
+	return;
+}
+
+int resolve_pkg_dependencies(CURL *curl, aurpkg_t *package) {
+	alpm_list_t *i;
+
+	for(i = package->depends; i; i = i->next) {
+		resolve_one_dep(curl, i->data);
+	}
+
+	for(i = package->makedepends; i; i = i->next) {
+		resolve_one_dep(curl, i->data);
+	}
 
 	return 0;
 }
