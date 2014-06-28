@@ -1062,7 +1062,7 @@ int json_end_map(void *ctx)
 
 void *json_get_valueptr(json_parser_t *parser)
 {
-	uint8_t *addr;
+	uint8_t *addr = 0;
 
 	if(parser->key == NULL) {
 		return NULL;
@@ -1127,7 +1127,9 @@ int json_string(void *ctx, const unsigned char *data, size_t size)
 	}
 
 	/* hacky -- the AUR violates its own response structure by substituting a map
-	 * for a string when type=error. */
+	 * for a string when type=error.
+	 * TODO: this will be fixed in RPC v3.
+	 * */
 	if(p->key->type == JSON_KEY_METADATA && streq(p->key->name, "results")) {
 		p->error = strndup((const char*)data, size);
 		return 0;
@@ -1977,7 +1979,7 @@ void resolve_one_dep(CURL *curl, const char *depend) {
 	} else {
 		if(cfg.logmask & LOG_BRIEF &&
 						!alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-				cwr_printf(LOG_BRIEF, "S\t%s\n", sanitized);
+				cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\n", sanitized);
 		}
 		free(sanitized);
 		return;
