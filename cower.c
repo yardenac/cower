@@ -69,7 +69,7 @@ static inline void freep(void *p) { free(*(void**) p); }
 
 #define AUR_BASE_URL          "https://aur.archlinux.org"
 #define AUR_PKG_URL_FORMAT    AUR_BASE_URL "/packages/"
-#define AUR_RPC_URL           AUR_BASE_URL "/rpc.php?type=%s&arg=%s&v=2"
+#define AUR_RPC_URL           AUR_BASE_URL "/rpc.php?type=%s&arg=%s&v=3"
 
 #define NC                    "\033[0m"
 #define BOLD                  "\033[1m"
@@ -375,6 +375,7 @@ static const struct key_t json_keys[] = {
 	{ "URL",            JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, url) },
 	{ "URLPath",        JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, urlpath) },
 	{ "Version",        JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, ver) },
+	{ "error",          JSON_KEY_METADATA, 0, offsetof(json_parser_t, error) },
 	{ "resultcount",    JSON_KEY_METADATA, 0, offsetof(json_parser_t, resultcount) },
 	{ "results",        JSON_KEY_METADATA, 0, 0 },
 };
@@ -1124,15 +1125,6 @@ int json_string(void *ctx, const unsigned char *data, size_t size)
 	valueptr = json_get_valueptr(p);
 	if(valueptr == NULL) {
 		return 1;
-	}
-
-	/* hacky -- the AUR violates its own response structure by substituting a map
-	 * for a string when type=error.
-	 * TODO: this will be fixed in RPC v3.
-	 * */
-	if(p->key->type == JSON_KEY_METADATA && streq(p->key->name, "results")) {
-		p->error = strndup((const char*)data, size);
-		return 0;
 	}
 
 	if(p->key->multivalued) {
