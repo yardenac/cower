@@ -470,7 +470,7 @@ alpm_list_t *alpm_find_foreign_pkgs(void)
 	const alpm_list_t *i;
 	alpm_list_t *ret = NULL;
 
-	for(i = alpm_db_get_pkgcache(db_local); i; i = alpm_list_next(i)) {
+	for(i = alpm_db_get_pkgcache(db_local); i; i = i->next) {
 		alpm_pkg_t *pkg = i->data;
 
 		if(alpm_pkg_is_foreign(pkg)) {
@@ -488,7 +488,7 @@ int alpm_pkg_is_foreign(alpm_pkg_t *pkg)
 
 	pkgname = alpm_pkg_get_name(pkg);
 
-	for(i = alpm_get_syncdbs(pmhandle); i; i = alpm_list_next(i)) {
+	for(i = alpm_get_syncdbs(pmhandle); i; i = i->next) {
 		if(alpm_db_get_pkg(i->data, pkgname)) {
 			return 0;
 		}
@@ -504,7 +504,7 @@ const char *alpm_provides_pkg(const char *pkgname)
 	static pthread_mutex_t alpmlock = PTHREAD_MUTEX_INITIALIZER;
 
 	pthread_mutex_lock(&alpmlock);
-	for(i = alpm_get_syncdbs(pmhandle); i; i = alpm_list_next(i)) {
+	for(i = alpm_get_syncdbs(pmhandle); i; i = i->next) {
 		alpm_db_t *db = i->data;
 		if(alpm_find_satisfier(alpm_db_get_pkgcache(db), pkgname)) {
 			dbname = alpm_db_get_name(db);
@@ -861,26 +861,26 @@ finish:
 alpm_list_t *filter_results(alpm_list_t *list)
 {
 	const alpm_list_t *i, *j;
-	alpm_list_t *filterlist = NULL;
+	alpm_list_t *filtered = NULL;
 
 	if(!(cfg.opmask & OP_SEARCH)) {
 		return list;
 	}
 
-	for(i = cfg.targets; i; i = alpm_list_next(i)) {
+	for(i = cfg.targets; i; i = i->next) {
 		regex_t regex;
 		const char *targ = i->data;
-		filterlist = NULL;
+		filtered = NULL;
 
 		if(regcomp(&regex, targ, kRegexOpts) == 0) {
-			for(j = list; j; j = alpm_list_next(j)) {
+			for(j = list; j; j = j->next) {
 				aurpkg_t *pkg = j->data;
 				const char *name = pkg->name;
 				const char *desc = pkg->desc;
 
 				if(regexec(&regex, name, 0, 0, 0) != REG_NOMATCH ||
 						regexec(&regex, desc, 0, 0, 0) != REG_NOMATCH) {
-					filterlist = alpm_list_add(filterlist, pkg);
+					filtered = alpm_list_add(filtered, pkg);
 				} else {
 					aurpkg_free(pkg);
 				}
@@ -890,10 +890,10 @@ alpm_list_t *filter_results(alpm_list_t *list)
 
 		/* switcheroo */
 		alpm_list_free(list);
-		list = filterlist;
+		list = filtered;
 	}
 
-	return alpm_list_msort(filterlist, alpm_list_count(filterlist), aurpkg_cmp);
+	return alpm_list_msort(filtered, alpm_list_count(filtered), aurpkg_cmp);
 }
 
 int getcols(void)
@@ -1725,7 +1725,7 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 
 	for(i = list; i; i = next) {
 		size_t data_len = strlen(i->data);
-		next = alpm_list_next(i);
+		next = i->next;
 		if(wrap && cols > 0 && count + data_len >= cols) {
 			printf("%-*c", kInfoIndent + 1, '\n');
 			count = kInfoIndent;
@@ -1878,7 +1878,7 @@ void print_pkg_info(aurpkg_t *pkg)
 	if(pkg->optdepends) {
 		const alpm_list_t *i;
 		printf("Optional Deps  : %s\n", (const char*)pkg->optdepends->data);
-		for(i = pkg->optdepends->next; i; i = alpm_list_next(i)) {
+		for(i = pkg->optdepends->next; i; i = i->next) {
 			printf("%-*s%s\n", kInfoIndent, "", (const char*)i->data);
 		}
 	}
@@ -1948,7 +1948,7 @@ void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 		return;
 	}
 
-	for(i = results; i; i = alpm_list_next(i)) {
+	for(i = results; i; i = i->next) {
 		aurpkg_t *pkg = i->data;
 
 		/* don't print duplicates */
@@ -2289,7 +2289,7 @@ void *thread_pool(void *arg)
 		pthread_mutex_lock(&listlock);
 		if(workq) {
 			job = workq->data;
-			workq = alpm_list_next(workq);
+			workq = workq->next;
 		}
 		pthread_mutex_unlock(&listlock);
 
