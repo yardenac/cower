@@ -559,7 +559,7 @@ int aurpkg_cmp(const void *p1, const void *p2)
 	const aurpkg_t *pkg1 = p1;
 	const aurpkg_t *pkg2 = p2;
 
-	return cfg.sortorder * (cfg.sort_fn)(pkg1, pkg2);
+	return cfg.sortorder * cfg.sort_fn(pkg1, pkg2);
 }
 
 int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
