@@ -215,7 +215,7 @@ static alpm_list_t *alpm_find_foreign_pkgs(void);
 static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
-static int archive_extract_file(const struct response_t*, char**);
+static int archive_extract_file(const struct response_t*);
 static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
@@ -516,55 +516,42 @@ const char *alpm_provides_pkg(const char *pkgname)
 	return dbname;
 }
 
-int archive_extract_file(const struct response_t *file, char **subdir)
+int archive_extract_file(const struct response_t *file)
 {
 	struct archive *archive;
 	struct archive_entry *entry;
 	const int archive_flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME;
-	int want_subdir = subdir != NULL, ok, ret = 0;
+	int r;
 
 	archive = archive_read_new();
 	archive_read_support_filter_all(archive);
 	archive_read_support_format_all(archive);
 
-	want_subdir = (subdir != NULL);
-
-	ret = archive_read_open_memory(archive, file->data, file->size);
-	if(ret == ARCHIVE_OK) {
-		while(archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
-			const char *entryname = archive_entry_pathname(entry);
-
-			if(want_subdir) {
-				size_t entrylen = strlen(entryname);
-				if(streq(&entryname[entrylen - sizeof("PKGBUILD")], "/PKGBUILD")) {
-					*subdir = strndup(entryname, entrylen - sizeof("PKGBUILD"));
-					cwr_printf(LOG_DEBUG, "found subdir: %s\n", *subdir);
-					want_subdir = 0;
-				}
-			}
-
-			cwr_printf(LOG_DEBUG, "extracting file: %s\n", entryname);
-
-			ok = archive_read_extract(archive, entry, archive_flags);
-			/* NOOP ON ARCHIVE_{OK,WARN,RETRY} */
-			if(ok == ARCHIVE_FATAL || ok == ARCHIVE_WARN) {
-				ret = archive_errno(archive);
-				break;
-			} else if (ok == ARCHIVE_EOF) {
-				ret = 0;
-				break;
-			}
-		}
-		archive_read_close(archive);
+	r = archive_read_open_memory(archive, file->data, file->size);
+	if(r != ARCHIVE_OK) {
+		return archive_errno(archive);
 	}
+
+	while(archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+		const char *entryname = archive_entry_pathname(entry);
+
+		cwr_printf(LOG_DEBUG, "extracting file: %s\n", entryname);
+
+		r = archive_read_extract(archive, entry, archive_flags);
+		/* NOOP ON ARCHIVE_{OK,WARN,RETRY} */
+		if(r == ARCHIVE_FATAL || r == ARCHIVE_WARN) {
+			r = archive_errno(archive);
+			break;
+		} else if (r == ARCHIVE_EOF) {
+			r = 0;
+			break;
+		}
+	}
+
+	archive_read_close(archive);
 	archive_read_free(archive);
 
-	if(want_subdir && *subdir == NULL) {
-		/* massively broken PKGBUILD without a subdir... */
-		*subdir = strdup("");
-	}
-
-	return ret;
+	return r;
 }
 
 int aurpkg_cmp(const void *p1, const void *p2)
@@ -781,7 +768,7 @@ void *download(CURL *curl, void *arg)
 	alpm_list_t *queryresult = NULL;
 	aurpkg_t *result;
 	CURLcode curlstat;
-	char *url, *subdir = NULL;
+	char *url;
 	int ret;
 	long httpcode;
 	struct response_t response = { 0, 0 };
@@ -834,7 +821,7 @@ void *download(CURL *curl, void *arg)
 			goto finish;
 	}
 
-	ret = archive_extract_file(&response, &subdir);
+	ret = archive_extract_file(&response);
 	if(ret != 0) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
@@ -853,7 +840,6 @@ void *download(CURL *curl, void *arg)
 finish:
 	free(url);
 	free(response.data);
-	free(subdir);
 
 	return queryresult;
 }
