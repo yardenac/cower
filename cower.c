@@ -2298,35 +2298,35 @@ void usage(void)
 	    "Usage: cower <operations> [options] target...\n\n", COWER_VERSION);
 	fprintf(stderr,
 	    " Operations:\n"
-	    "  -d, --download          download target(s) -- pass twice to "
-	                                 "download AUR dependencies\n"
-	    "  -i, --info              show info for target(s) -- pass twice for "
-	                                 "more detail\n"
-	    "  -m, --msearch           show packages maintained by target(s)\n"
-	    "  -s, --search            search for target(s)\n"
-	    "  -u, --update            check for updates against AUR -- can be combined "
-	                                 "with the -d flag\n\n");
+	    "  -d, --download            download target(s) -- pass twice to "
+	                                   "download AUR dependencies\n"
+	    "  -i, --info                show info for target(s) -- pass twice for "
+	                                   "more detail\n"
+	    "  -m, --msearch             show packages maintained by target(s)\n"
+	    "  -s, --search              search for target(s)\n"
+	    "  -u, --update              check for updates against AUR -- can be combined "
+	                                   "with the -d flag\n\n");
 	fprintf(stderr, " General options:\n"
-	    "  -f, --force             overwrite existing files when downloading\n"
-	    "  -h, --help              display this help and exit\n"
-	    "      --ignore <pkg>      ignore a package upgrade (can be used more than once)\n"
-	    "      --ignorerepo[=repo] ignore some or all binary repos\n"
-	    "  -t, --target <dir>      specify an alternate download directory\n"
-	    "      --threads <num>     limit number of threads created\n"
-	    "      --timeout <num>     specify connection timeout in seconds\n"
-	    "  -V, --version           display version\n\n");
+	    "  -f, --force               overwrite existing files when downloading\n"
+	    "  -h, --help                display this help and exit\n"
+	    "      --ignore <pkg>        ignore a package upgrade (can be used more than once)\n"
+	    "      --ignorerepo[=repo]   ignore some or all binary repos\n"
+	    "  -t, --target <dir>        specify an alternate download directory\n"
+	    "      --threads <num>       limit number of threads created\n"
+	    "      --timeout <num>       specify connection timeout in seconds\n"
+	    "  -V, --version             display version\n\n");
 	fprintf(stderr, " Output options:\n"
-	    "  -b, --brief             show output in a more script friendly format\n"
-	    "  -cWHEN, --color[=WHEN]  use colored output. WHEN is `never', `always', or `auto'\n"
-	    "      --debug             show debug output\n"
-	    "      --format <string>   print package output according to format string\n"
-	    "  -o, --ignore-ood        skip displaying out of date packages\n"
-	    "      --no-ignore-ood     the opposite of --ignore-ood\n"
-	    "      --sort <key>        sort results in ascending order by key\n"
-	    "      --rsort <key>       sort results in descending order by key\n"
-	    "      --listdelim <delim> change list format delimeter\n"
-	    "  -q, --quiet             output less\n"
-	    "  -v, --verbose           output more\n\n");
+	    "  -b, --brief               show output in a more script friendly format\n"
+	    "  -c[WHEN], --color[=WHEN]  use colored output. WHEN is `never', `always', or `auto'\n"
+	    "      --debug               show debug output\n"
+	    "      --format <string>     print package output according to format string\n"
+	    "  -o, --ignore-ood          skip displaying out of date packages\n"
+	    "      --no-ignore-ood       the opposite of --ignore-ood\n"
+	    "      --sort <key>          sort results in ascending order by key\n"
+	    "      --rsort <key>         sort results in descending order by key\n"
+	    "      --listdelim <delim>   change list format delimeter\n"
+	    "  -q, --quiet               output less\n"
+	    "  -v, --verbose             output more\n\n");
 }
 
 void version(void)
