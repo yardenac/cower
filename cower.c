@@ -930,6 +930,7 @@ char *get_file_as_buffer(const char *path)
 
 	if(nread < fsize) {
 		cwr_fprintf(stderr, LOG_ERROR, "Failed to read full PKGBUILD\n");
+		free(buf);
 		return NULL;
 	}
 
