@@ -227,7 +227,6 @@ static int aurpkg_cmp(const void*, const void*);
 static aurpkg_t *aurpkg_dup(const aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(aurpkg_t*);
-static int globcompare(const void *a, const void *b);
 static const char *category_id_to_string(size_t id);
 static CURL *curl_init_easy_handle(CURL*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
@@ -235,11 +234,13 @@ static int cwr_asprintf(char**, const char*, ...) __attribute__((format(printf,2
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
+static alpm_list_t *dedupe_results(alpm_list_t *list);
 static void *download(CURL *curl, void*);
 static alpm_list_t *filter_results(alpm_list_t*);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static int get_config_path(char *config_path, size_t pathlen);
+static int globcompare(const void *a, const void *b);
 static void indentprint(const char*, int);
 static int json_end_map(void*);
 static void *json_get_valueptr(json_parser_t *parser);
@@ -844,6 +845,27 @@ finish:
 	return queryresult;
 }
 
+alpm_list_t *dedupe_results(alpm_list_t *list)
+{
+	alpm_list_t *i, *uniqued = NULL;
+	aurpkg_t *prev = NULL;
+
+	list = alpm_list_msort(list, alpm_list_count(list), (alpm_list_fn_cmp)aurpkg_cmpname);
+
+	for(i = list; i; i = i->next) {
+		aurpkg_t *pkg = i->data;
+
+		if(!prev || aurpkg_cmpname(pkg, prev) != 0) {
+			uniqued = alpm_list_add(uniqued, pkg);
+		}
+		prev = pkg;
+	}
+
+	alpm_list_free(list);
+
+	return uniqued;
+}
+
 alpm_list_t *filter_results(alpm_list_t *list)
 {
 	const alpm_list_t *i, *j;
@@ -852,6 +874,8 @@ alpm_list_t *filter_results(alpm_list_t *list)
 	if(!(cfg.opmask & OP_SEARCH)) {
 		return list;
 	}
+
+	list = dedupe_results(list);
 
 	for(i = cfg.targets; i; i = i->next) {
 		regex_t regex;
@@ -1039,7 +1063,7 @@ int json_end_map(void *ctx)
 	p->depth--;
 	if(p->depth > 0) {
 		if(!(p->aurpkg.ood && cfg.ignoreood)) {
-			p->pkglist = alpm_list_add_sorted(p->pkglist, aurpkg_dup(&p->aurpkg), aurpkg_cmp);
+			p->pkglist = alpm_list_add(p->pkglist, aurpkg_dup(&p->aurpkg));
 		} else {
 			aurpkg_free_inner(&p->aurpkg);
 		}
@@ -1924,7 +1948,6 @@ void print_pkg_search(aurpkg_t *pkg)
 void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 {
 	const alpm_list_t *i;
-	aurpkg_t *prev = NULL;
 
 	if(!printfn) {
 		return;
@@ -1936,13 +1959,7 @@ void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 	}
 
 	for(i = results; i; i = i->next) {
-		aurpkg_t *pkg = i->data;
-
-		/* don't print duplicates */
-		if(!prev || aurpkg_cmpname(pkg, prev) != 0) {
-			printfn(pkg);
-		}
-		prev = pkg;
+		printfn(i->data);
 	}
 }
 
