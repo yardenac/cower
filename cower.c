@@ -857,8 +857,10 @@ alpm_list_t *dedupe_results(alpm_list_t *list)
 
 		if(!prev || aurpkg_cmpname(pkg, prev) != 0) {
 			uniqued = alpm_list_add(uniqued, pkg);
+			prev = pkg;
+		} else {
+			aurpkg_free(pkg);
 		}
-		prev = pkg;
 	}
 
 	alpm_list_free(list);
