@@ -1629,8 +1629,8 @@ int pkg_is_binary(const char *pkg)
 	const char *db = alpm_provides_pkg(pkg);
 
 	if(db) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", pkg);
-		cwr_fprintf(stderr, LOG_ERROR, "%s%s%s is available in %s%s%s "
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", pkg);
+		cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s "
 				"(ignore this with --ignorerepo=%s)\n",
 				colstr.pkg, pkg, colstr.nc,
 				colstr.repo, db, colstr.nc,
