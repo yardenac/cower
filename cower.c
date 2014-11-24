@@ -1712,8 +1712,8 @@ int print_escaped(const char *delim)
 				case 'v':
 					fputc('\v', stdout);
 					break;
-				++out;
 			}
+			++out;
 		} else {
 			fputc(*f, stdout);
 			++out;
