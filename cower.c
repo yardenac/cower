@@ -905,7 +905,7 @@ alpm_list_t *filter_results(alpm_list_t *list)
 		list = filtered;
 	}
 
-	return alpm_list_msort(filtered, alpm_list_count(filtered), aurpkg_cmp);
+	return alpm_list_msort(list, alpm_list_count(list), aurpkg_cmp);
 }
 
 int getcols(void)
