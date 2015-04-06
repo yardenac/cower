@@ -77,7 +77,7 @@ Overwrite existing files when downloading.
 
 =item B<--format=>I<FORMAT>
 
-Print outside from B<--info>, B<--search>, and B<--msearch> operations
+Print output from B<--info>, B<--search>, and B<--msearch> operations
 described by the provided format string. See the FORMATTING section.
 
 =item B<-h, --help>
