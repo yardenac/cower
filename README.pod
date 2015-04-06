@@ -48,7 +48,8 @@ will return expected results.
 Check foreign packages for updates in the AUR. Without any arguments, all
 manually installed packages will be checked. If targets are supplied, only
 those targets will be checked. This operation can be combined with the
-B<--download> operation.
+B<--download> operation. cower will exit with a non-zero status if and only
+if no updates are available.
 
 =back
 
