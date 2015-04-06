@@ -165,6 +165,8 @@ formatter:
 
   %a    last modified
 
+  %b    package base
+
   %c    category
 
   %d    description

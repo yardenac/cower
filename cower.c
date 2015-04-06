@@ -1776,6 +1776,9 @@ void print_pkg_formatted(aurpkg_t *pkg)
 					snprintf(buf, 64, "%ld", pkg->lastmod);
 					printf(fmt, buf);
 					break;
+				case 'b':
+					printf(fmt, pkg->pkgbase);
+					break;
 				case 'c':
 					printf(fmt, category_id_to_string(pkg->cat));
 					break;
