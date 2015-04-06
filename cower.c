@@ -870,39 +870,39 @@ alpm_list_t *dedupe_results(alpm_list_t *list)
 
 alpm_list_t *filter_results(alpm_list_t *list)
 {
-	const alpm_list_t *i, *j;
-	alpm_list_t *filtered = NULL;
-
-	if(!(cfg.opmask & OP_SEARCH)) {
-		return list;
-	}
-
 	list = dedupe_results(list);
 
-	for(i = cfg.targets; i; i = i->next) {
-		regex_t regex;
-		const char *targ = i->data;
-		filtered = NULL;
+	if (cfg.opmask & OP_SEARCH) {
+		alpm_list_t *filtered = NULL;
+		const alpm_list_t *i;
 
-		if(regcomp(&regex, targ, kRegexOpts) == 0) {
-			for(j = list; j; j = j->next) {
-				aurpkg_t *pkg = j->data;
-				const char *name = pkg->name;
-				const char *desc = pkg->desc;
+		for(i = cfg.targets; i; i = i->next) {
+			regex_t regex;
+			const char *targ = i->data;
+			filtered = NULL;
 
-				if(regexec(&regex, name, 0, 0, 0) != REG_NOMATCH ||
-						regexec(&regex, desc, 0, 0, 0) != REG_NOMATCH) {
-					filtered = alpm_list_add(filtered, pkg);
-				} else {
-					aurpkg_free(pkg);
+			if(regcomp(&regex, targ, kRegexOpts) == 0) {
+				alpm_list_t *j;
+
+				for(j = list; j; j = j->next) {
+					aurpkg_t *pkg = j->data;
+					const char *name = pkg->name;
+					const char *desc = pkg->desc;
+
+					if(regexec(&regex, name, 0, 0, 0) != REG_NOMATCH ||
+							regexec(&regex, desc, 0, 0, 0) != REG_NOMATCH) {
+						filtered = alpm_list_add(filtered, pkg);
+					} else {
+						aurpkg_free(pkg);
+					}
 				}
+				regfree(&regex);
 			}
-			regfree(&regex);
-		}
 
-		/* switcheroo */
-		alpm_list_free(list);
-		list = filtered;
+			/* switcheroo */
+			alpm_list_free(list);
+			list = filtered;
+		}
 	}
 
 	return alpm_list_msort(list, alpm_list_count(list), aurpkg_cmp);
