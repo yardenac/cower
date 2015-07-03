@@ -171,8 +171,6 @@ formatter:
 
   %b    package base
 
-  %c    category
-
   %d    description
 
   %i    id

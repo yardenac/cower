@@ -227,7 +227,6 @@ static int aurpkg_cmp(const void*, const void*);
 static aurpkg_t *aurpkg_dup(const aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(aurpkg_t*);
-static const char *category_id_to_string(size_t id);
 static CURL *curl_init_easy_handle(CURL*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
@@ -347,14 +346,8 @@ static yajl_callbacks callbacks = {
 static char const *digits = "0123456789";
 static char const *printf_flags = "'-+ #0I";
 
-static const char *aur_cat[] = { NULL, "None", "daemons", "devel", "editors",
-                                "emulators", "games", "gnome", "i18n", "kde", "lib",
-                                "modules", "multimedia", "network", "office",
-                                "science", "system", "x11", "xfce", "kernels", "fonts" };
-
 /* list must be sorted by the string value */
 static const struct key_t json_keys[] = {
-	{ "CategoryID",     JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, cat) },
 	{ "CheckDepends",   JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, checkdepends) },
 	{ "Conflicts",      JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, conflicts) },
 	{ "Depends",        JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, depends) },
@@ -676,15 +669,6 @@ void aurpkg_free_inner(aurpkg_t *pkg)
 	FREELIST(pkg->licenses);
 
 	memset(pkg, 0, sizeof(aurpkg_t));
-}
-
-const char *category_id_to_string(size_t id)
-{
-	if(id >= (sizeof(aur_cat)/sizeof(aur_cat[0] + 1))) {
-		return "Unknown";
-	} else {
-		return aur_cat[id];
-	}
 }
 
 int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...)
@@ -1803,9 +1787,6 @@ void print_pkg_formatted(aurpkg_t *pkg)
 				case 'b':
 					printf(fmt, pkg->pkgbase);
 					break;
-				case 'c':
-					printf(fmt, category_id_to_string(pkg->cat));
-					break;
 				case 'd':
 					printf(fmt, pkg->desc ? pkg->desc : "");
 					break;
@@ -1930,8 +1911,6 @@ void print_pkg_info(aurpkg_t *pkg)
 	}
 
 	print_extinfo_list(pkg->replaces, "Replaces", kListDelim, 1);
-
-	printf("Category       : %s\n", category_id_to_string(pkg->cat));
 
 	print_extinfo_list(pkg->licenses, "License", kListDelim, 1);
 
