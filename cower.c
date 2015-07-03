@@ -1599,9 +1599,6 @@ int parse_keyname(char* keyname)
 	if(streq("name", keyname)) {
 		cfg.sort_fn = aurpkg_cmpname;
 		return 0;
-	} else if(streq("votes", keyname)) {
-		cfg.sort_fn = aurpkg_cmpvotes;
-		return 0;
 	} else if(streq("version", keyname)) {
 		cfg.sort_fn = aurpkg_cmpver;
 		return 0;
