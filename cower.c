@@ -1982,9 +1982,9 @@ void print_pkg_search(aurpkg_t *pkg)
 		printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
 	} else {
 		alpm_pkg_t *ipkg;
-		printf("%saur/%s%s%s %s%s%s%s (%d)", colstr.repo, colstr.nc, colstr.pkg,
+		printf("%saur/%s%s%s %s%s%s%s (%d, %.2f)", colstr.repo, colstr.nc, colstr.pkg,
 				pkg->name, pkg->ood ? colstr.ood : colstr.utd, pkg->ver,
-				NCFLAG(pkg->ood, " <!>"), colstr.nc, pkg->votes);
+				NCFLAG(pkg->ood, " <!>"), colstr.nc, pkg->votes, pkg->popularity);
 		if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 			const char *instcolor;
 			if(alpm_pkg_vercmp(pkg->ver, alpm_pkg_get_version(ipkg)) > 0) {
