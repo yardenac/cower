@@ -27,6 +27,7 @@
 /* glibc */
 #include <ctype.h>
 #include <errno.h>
+#include <float.h>
 #include <fnmatch.h>
 #include <getopt.h>
 #include <locale.h>
@@ -168,6 +169,7 @@ struct aurpkg_t {
 	int pkgbaseid;
 	int ood;
 	int votes;
+	double popularity;
 	time_t firstsub;
 	time_t lastmod;
 
@@ -219,6 +221,7 @@ static char *aur_vurlf(const char *urlpath_format, va_list ap);
 static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
+static int aurpkg_cmppopularity(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpood(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmplastmod(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
@@ -243,6 +246,7 @@ static void indentprint(const char*, int);
 static int json_end_map(void*);
 static void *json_get_valueptr(json_parser_t *parser);
 static int json_integer(void *ctx, long long);
+static int json_double(void *ctx, double);
 static int json_map_key(void*, const unsigned char*, size_t);
 static int json_start_map(void*);
 static int json_string(void*, const unsigned char*, size_t);
@@ -333,7 +337,7 @@ static yajl_callbacks callbacks = {
 	NULL,             /* null */
 	NULL,             /* boolean */
 	json_integer,     /* integer */
-	NULL,             /* double */
+	json_double,      /* double */
 	NULL,             /* number */
 	json_string,      /* string */
 	json_start_map,   /* start_map */
@@ -365,6 +369,7 @@ static const struct key_t json_keys[] = {
 	{ "OutOfDate",      JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, ood) },
 	{ "PackageBase",    JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, pkgbase) },
 	{ "PackageBaseID",  JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, pkgbaseid) },
+	{ "Popularity",     JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, popularity) },
 	{ "Provides",       JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, provides) },
 	{ "Replaces",       JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, replaces) },
 	{ "URL",            JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, url) },
@@ -609,6 +614,18 @@ int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 
 int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 	return pkg1->votes - pkg2->votes;
+}
+
+int aurpkg_cmppopularity(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
+	double diff = pkg1->popularity - pkg2->popularity;
+
+	if(diff > DBL_EPSILON) {
+		return 1;
+	} else if(diff < -DBL_EPSILON) {
+		return -1;
+	} else {
+		return 0;
+	}
 }
 
 int aurpkg_cmpood(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
@@ -1105,6 +1122,21 @@ int json_integer(void *ctx, long long val)
 {
 	json_parser_t *p = ctx;
 	int *valueptr;
+
+	valueptr = json_get_valueptr(p);
+	if(valueptr == NULL) {
+		return 1;
+	}
+
+	*valueptr = val;
+
+	return 1;
+}
+
+int json_double(void *ctx, double val)
+{
+	json_parser_t *p = ctx;
+	double *valueptr;
 
 	valueptr = json_get_valueptr(p);
 	if(valueptr == NULL) {
@@ -1619,6 +1651,9 @@ int parse_keyname(char* keyname)
 	} else if(streq("votes", keyname)) {
 		cfg.sort_fn = aurpkg_cmpvotes;
 		return 0;
+	} else if(streq("popularity", keyname)) {
+		cfg.sort_fn = aurpkg_cmppopularity;
+		return 0;
 	} else if(streq("outofdate", keyname)) {
 		cfg.sort_fn = aurpkg_cmpood;
 		return 0;
@@ -1808,6 +1843,10 @@ void print_pkg_formatted(aurpkg_t *pkg)
 					snprintf(buf, 64, "https://%s/packages/%s", arg_aur_domain,pkg->name);
 					printf(fmt, buf);
 					break;
+				case 'r':
+					snprintf(buf, 64, "%.2f", pkg->popularity);
+					printf(fmt, buf);
+					break;
 				case 's':
 					snprintf(buf, 64, "%ld", pkg->firstsub);
 					printf(fmt, buf);
@@ -1915,8 +1954,10 @@ void print_pkg_info(aurpkg_t *pkg)
 	print_extinfo_list(pkg->licenses, "License", kListDelim, 1);
 
 	printf("Votes          : %d\n"
+				 "Popularity     : %.2f\n"
 				 "Out of Date    : %s%s%s\n",
 				 pkg->votes,
+				 pkg->popularity,
 				 pkg->ood ? colstr.ood : colstr.utd,
 				 pkg->ood ? "Yes" : "No", colstr.nc);
 

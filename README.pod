@@ -120,7 +120,7 @@ Ignore all results marked as out of date.
 
 Sort the results in ascending or descending order, respectively, by I<KEY>
 where I<KEY> is B<firstsubmitted>, B<lastmodified>, B<maintainer>, B<name>,
-B<outofdate>, B<version> or B<votes>.
+B<outofdate>, B<version>, B<votes> or B<popularity>.
 
 =item B<-p, --from-pkgbuild>
 
@@ -184,6 +184,8 @@ formatter:
   %o    votes
 
   %p    AUR page
+
+  %r    popularity
 
   %s    submission date
 
