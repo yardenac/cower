@@ -67,10 +67,6 @@ static inline void freep(void *p) { free(*(void**) p); }
 	#define PACMAN_CONFIG       "/etc/pacman.conf"
 #endif
 
-#define AUR_BASE_URL          "https://aur.archlinux.org"
-#define AUR_PKG_URL_FORMAT    AUR_BASE_URL "/packages/"
-#define AUR_RPC_URL           AUR_BASE_URL "/rpc.php?type=%s&arg=%s&v=3"
-
 #define NC                    "\033[0m"
 #define BOLD                  "\033[1m"
 
@@ -124,7 +120,8 @@ enum {
 	OP_THREADS,
 	OP_TIMEOUT,
 	OP_VERSION,
-	OP_NOIGNOREOOD
+	OP_NOIGNOREOOD,
+	OP_AURDOMAIN,
 };
 
 enum {
@@ -216,6 +213,9 @@ static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*);
+static char *aur_build_rpc_url(const char *type, const char *escaped_arg);
+static char *aur_urlf(const char *urlpath_format, ...);
+static char *aur_vurlf(const char *urlpath_format, va_list ap);
 static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
@@ -230,7 +230,6 @@ static void aurpkg_free_inner(aurpkg_t*);
 static const char *category_id_to_string(size_t id);
 static CURL *curl_init_easy_handle(CURL*);
 static size_t curl_write_response(void*, size_t, size_t, void*);
-static int cwr_asprintf(char**, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
@@ -311,6 +310,8 @@ static struct {
 	  alpm_list_t *repos;
 	} ignore;
 } cfg;
+
+static char *arg_aur_domain = "aur.archlinux.org";
 
 /* globals */
 static alpm_handle_t *pmhandle;
@@ -555,6 +556,44 @@ int archive_extract_file(const struct response_t *file)
 	return r;
 }
 
+char *aur_vurlf(const char *urlpath_format, va_list ap) {
+	int len;
+	va_list aq;
+	char *out, *p;
+
+	va_copy(aq, ap);
+
+	len = strlen("https://") + strlen(arg_aur_domain) + strlen("/") +
+			vsnprintf(NULL, 0, urlpath_format, aq) + 1;
+
+	out = malloc(len);
+	if(out == NULL) {
+		return NULL;
+	}
+
+	p = stpcpy(stpcpy(out, "https://"), arg_aur_domain);
+	*p++ = '/';
+	p += vsprintf(p, urlpath_format, ap);
+	*p = '\0';
+
+	return out;
+}
+
+char *aur_urlf(const char *urlpath_format, ...) {
+	va_list ap;
+	char *out;
+
+	va_start(ap, urlpath_format);
+	out = aur_vurlf(urlpath_format, ap);
+	va_end(ap);
+
+	return out;
+}
+
+char *aur_build_rpc_url(const char *type, const char *escaped_arg) {
+	return aur_urlf("rpc.php?v=3&type=%s&arg=%s", type, escaped_arg);
+}
+
 int aurpkg_cmp(const void *p1, const void *p2)
 {
 	const aurpkg_t *pkg1 = p1;
@@ -646,22 +685,6 @@ const char *category_id_to_string(size_t id)
 	} else {
 		return aur_cat[id];
 	}
-}
-
-int cwr_asprintf(char **string, const char *format, ...)
-{
-	int ret = 0;
-	va_list args;
-
-	va_start(args, format);
-	ret = vasprintf(string, format, args);
-	va_end(args);
-
-	if(ret == -1) {
-		cwr_fprintf(stderr, LOG_ERROR, "failed to allocate string\n");
-	}
-
-	return ret;
 }
 
 int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...)
@@ -797,7 +820,7 @@ void *download(CURL *curl, void *arg)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 
 	result = queryresult->data;
-	cwr_asprintf(&url, AUR_BASE_URL "%s", result->urlpath);
+	url = aur_urlf("%s", result->urlpath);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 
 	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char*)arg, url);
@@ -1426,6 +1449,7 @@ int parse_options(int argc, char *argv[])
 		{"brief",         no_argument,        0, 'b'},
 		{"color",         optional_argument,  0, 'c'},
 		{"debug",         no_argument,        0, OP_DEBUG},
+		{"domain",        required_argument,  0, OP_AURDOMAIN},
 		{"force",         no_argument,        0, 'f'},
 		{"format",        required_argument,  0, OP_FORMAT},
 		{"sort",          required_argument,  0, OP_SORT},
@@ -1547,6 +1571,9 @@ int parse_options(int argc, char *argv[])
 				break;
 			case OP_NOIGNOREOOD:
 				cfg.ignoreood = 0;
+				break;
+			case OP_AURDOMAIN:
+				arg_aur_domain = optarg;
 				break;
 			case OP_LISTDELIM:
 				cfg.delim = optarg;
@@ -1797,7 +1824,7 @@ void print_pkg_formatted(aurpkg_t *pkg)
 					printf(fmt, buf);
 					break;
 				case 'p':
-					snprintf(buf, 64, AUR_PKG_URL_FORMAT "%s", pkg->name);
+					snprintf(buf, 64, "https://%s/packages/%s", arg_aur_domain,pkg->name);
 					printf(fmt, buf);
 					break;
 				case 's':
@@ -1885,8 +1912,8 @@ void print_pkg_info(aurpkg_t *pkg)
 	printf("Version        : %s%s%s\n",
 			pkg->ood ? colstr.ood : colstr.utd, pkg->ver, colstr.nc);
 	printf("URL            : %s%s%s\n", colstr.url, pkg->url, colstr.nc);
-	printf("AUR Page       : %s" AUR_PKG_URL_FORMAT "%s%s\n",
-			colstr.url, pkg->name, colstr.nc);
+	printf("AUR Page       : %shttps://%s/packages/%s%s\n",
+			colstr.url, arg_aur_domain, pkg->name, colstr.nc);
 
 	print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
 	print_extinfo_list(pkg->makedepends, "Makedepends", kListDelim, 1);
@@ -2186,11 +2213,11 @@ void *task_query(CURL *curl, void *arg)
 
 	escaped = curl_easy_escape(NULL, argstr, span);
 	if(cfg.opmask & OP_SEARCH) {
-		cwr_asprintf(&url, AUR_RPC_URL, "search", escaped);
+		url = aur_build_rpc_url("search", escaped);
 	} else if(cfg.opmask & OP_MSEARCH) {
-		cwr_asprintf(&url, AUR_RPC_URL, "msearch", escaped);
+		url = aur_build_rpc_url("msearch", escaped);
 	} else {
-		cwr_asprintf(&url, AUR_RPC_URL, "info", escaped);
+		url = aur_build_rpc_url("info", escaped);
 	}
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 
@@ -2336,6 +2363,7 @@ void usage(void)
 	    "  -u, --update              check for updates against AUR -- can be combined "
 	                                   "with the -d flag\n\n");
 	fprintf(stderr, " General options:\n"
+	    "      --domain <fqdn>       point cower at a different AUR (default: aur.archlinux.org)\n"
 	    "  -f, --force               overwrite existing files when downloading\n"
 	    "  -h, --help                display this help and exit\n"
 	    "      --ignore <pkg>        ignore a package upgrade (can be used more than once)\n"

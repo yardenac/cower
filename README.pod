@@ -68,6 +68,10 @@ for some sort of automation.
 Use colored output. I<WHEN> is B<never>, B<always> or B<auto>. Color will be
 disabled in a pipe unless I<WHEN> is set to always.
 
+=item B<--domain=>I<FQDN>
+
+Point cower at a domain other than the default of B<aur.archlinux.org>.
+
 =item B<--debug>
 
 Show debug output. This option should be passed first if used.
