@@ -591,7 +591,7 @@ char *aur_urlf(const char *urlpath_format, ...) {
 }
 
 char *aur_build_rpc_url(const char *type, const char *escaped_arg) {
-	return aur_urlf("rpc.php?v=3&type=%s&arg=%s", type, escaped_arg);
+	return aur_urlf("rpc.php?v=4&type=%s&arg=%s", type, escaped_arg);
 }
 
 int aurpkg_cmp(const void *p1, const void *p2)
