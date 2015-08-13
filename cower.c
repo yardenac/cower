@@ -913,7 +913,7 @@ alpm_list_t *filter_results(alpm_list_t *list)
 					const char *desc = pkg->desc;
 
 					if(regexec(&regex, name, 0, 0, 0) != REG_NOMATCH ||
-							regexec(&regex, desc, 0, 0, 0) != REG_NOMATCH) {
+							(desc && regexec(&regex, desc, 0, 0, 0) != REG_NOMATCH)) {
 						filtered = alpm_list_add(filtered, pkg);
 					} else {
 						aurpkg_free(pkg);
@@ -1807,7 +1807,7 @@ void print_pkg_formatted(aurpkg_t *pkg)
 					printf(fmt, category_id_to_string(pkg->cat));
 					break;
 				case 'd':
-					printf(fmt, pkg->desc);
+					printf(fmt, pkg->desc ? pkg->desc : "");
 					break;
 				case 'i':
 					snprintf(buf, 64, "%d", pkg->id);
