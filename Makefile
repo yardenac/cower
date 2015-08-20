@@ -58,5 +58,9 @@ distcheck: dist
 clean:
 	$(RM) $(OUT) $(OBJ) $(MANPAGES)
 
+upload: dist
+	gpg --detach-sign cower-$(VERSION).tar.gz
+	scp cower-$(VERSION).tar.gz cower-$(VERSION).tar.gz.sig code.falconindy.com:archive/cower/
+
 .PHONY: clean dist doc install uninstall
 
