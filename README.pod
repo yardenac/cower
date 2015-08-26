@@ -197,9 +197,8 @@ formatter:
 
   %%    a literal %
 
-When B<--info> is specified twice, the following formatters are also available
-(if the PKGBUILD specifies them). Items in these lists are delimited according
-to the B<--listdelim> option.
+The following sequences refer to multivalued items which are delimited by the
+B<--listdelim> option.
 
   %C    conflicts
 
@@ -216,6 +215,9 @@ to the B<--listdelim> option.
 Full printf formatter support with justification and field width is supported,
 e.g. '%-20o'. Simple backslash escape sequences are also honored for lowercase
 formatters -- see B<printf>(1).
+
+B<NB>: Many of these fields are optional, and not all PKGBUILDs will define all
+available fields.
 
 =head1 CONFIG FILE
 
