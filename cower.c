@@ -836,14 +836,11 @@ void *download(CURL *curl, void *arg)
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
 	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
 
-	switch(httpcode) {
-		case 200:
-			break;
-		default:
-			cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-			cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
-					(const char*)arg, httpcode);
-			goto finish;
+	if(httpcode != 200) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
+				(const char*)arg, httpcode);
+		goto finish;
 	}
 
 	ret = archive_extract_file(&response);
