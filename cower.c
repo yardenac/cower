@@ -2429,15 +2429,15 @@ size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream)
 
 int read_targets_from_file(FILE *in, alpm_list_t **targets) {
 	char line[BUFSIZ];
-	int i = 0, end = 0;
+	int i = 0, c = 0, end = 0;
 	while(!end) {
-		line[i] = fgetc(in);
+		c = fgetc(in);
 
-		if(line[i] == EOF) {
+		if(c == EOF) {
 			end = 1;
 		}
 
-		if(isspace(line[i]) || end) {
+		if(end || isspace(c)) {
 			line[i] = '\0';
 			/* avoid adding zero length arg, if multiple spaces separate args */
 			if(i > 0) {
@@ -2448,6 +2448,7 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) {
 				i = 0;
 			}
 		} else {
+			line[i] = c;
 			++i;
 			if(i >= BUFSIZ) {
 				cwr_fprintf(stderr, LOG_ERROR, "buffer overflow detected in stdin\n");
