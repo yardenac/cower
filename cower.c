@@ -204,7 +204,6 @@ struct response_t {
 
 struct task_t {
 	void *(*threadfn)(CURL*, void*);
-	void (*printfn)(aurpkg_t*);
 };
 
 /* function prototypes */
@@ -2464,8 +2463,8 @@ int main(int argc, char *argv[]) {
 	alpm_list_t *results = NULL, *thread_return = NULL;
 	int ret, n, num_threads;
 	pthread_t *threads;
+	void (*printfn)(aurpkg_t*) = NULL;
 	struct task_t task = {
-		.printfn = NULL,
 		.threadfn = task_query
 	};
 
@@ -2568,9 +2567,9 @@ int main(int argc, char *argv[]) {
 	if(cfg.opmask & OP_UPDATE) {
 		task.threadfn = task_update;
 	} else if(cfg.opmask & OP_INFO) {
-		task.printfn = cfg.format ? print_pkg_formatted : print_pkg_info;
+		printfn = cfg.format ? print_pkg_formatted : print_pkg_info;
 	} else if(cfg.opmask & (OP_SEARCH|OP_MSEARCH)) {
-		task.printfn = cfg.format ? print_pkg_formatted : print_pkg_search;
+		printfn = cfg.format ? print_pkg_formatted : print_pkg_search;
 	} else if(cfg.opmask & OP_DOWNLOAD) {
 		task.threadfn = task_download;
 	}
@@ -2599,7 +2598,7 @@ int main(int argc, char *argv[]) {
 	 * this is opposing behavior, so just XOR the result on a pure update */
 	results = filter_results(results);
 	ret = ((results == NULL) ^ !(cfg.opmask & ~OP_UPDATE));
-	print_results(results, task.printfn);
+	print_results(results, printfn);
 	alpm_list_free_inner(results, aurpkg_free);
 	alpm_list_free(results);
 
