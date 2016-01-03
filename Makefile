@@ -3,9 +3,9 @@
 OUT        = cower
 VERSION    = $(shell git describe)
 
-SRC        = $(wildcard *.c)
+SRC        = cower.c aur.c
 OBJ        = $(SRC:.c=.o)
-DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c
+DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c aur.c aur.h
 
 PREFIX    ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
@@ -19,6 +19,8 @@ bash_completiondir = /usr/share/bash-completion/completions
 
 MANPAGES = \
 	cower.1
+
+$(OUT): $(OBJ)
 
 all: $(OUT) doc
 

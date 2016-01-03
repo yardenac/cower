@@ -50,6 +50,8 @@
 #include <openssl/crypto.h>
 #include <yajl/yajl_parse.h>
 
+#include "aur.h"
+
 /* macros */
 #define UNUSED                __attribute__((unused))
 #define NCFLAG(val, flag)     (!cfg.color && (val)) ? (flag) : ""
@@ -203,7 +205,9 @@ struct response_t {
 };
 
 struct task_t {
-	void *(*threadfn)(CURL*, void*);
+	struct aur_t *aur;
+	CURL *curl;
+	void *(*threadfn)(struct task_t*, void*);
 };
 
 /* function prototypes */
@@ -214,9 +218,6 @@ static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
 static int archive_extract_file(const struct response_t*);
-static char *aur_build_rpc_url(const char *type, const char *escaped_arg);
-static char *aur_urlf(const char *urlpath_format, ...);
-static char *aur_vurlf(const char *urlpath_format, va_list ap);
 static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
@@ -235,7 +236,7 @@ static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((forma
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
 static alpm_list_t *dedupe_results(alpm_list_t *list);
-static void *download(CURL *curl, void*);
+static void *download(struct task_t *task, void*);
 static alpm_list_t *filter_results(alpm_list_t*);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
@@ -270,15 +271,15 @@ static void print_pkg_info(aurpkg_t*);
 static void print_pkg_search(aurpkg_t*);
 static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
-static void resolve_one_dep(CURL *curl, const char *depend);
-static int resolve_pkg_dependencies(CURL*, aurpkg_t *package);
+static void resolve_one_dep(struct task_t *task, const char *depend);
+static int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
 static int set_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
 static size_t strtrim(char*);
-static void *task_download(CURL*, void*);
-static void *task_query(CURL*, void*);
-static void *task_update(CURL*, void*);
+static void *task_download(struct task_t*, void*);
+static void *task_query(struct task_t*, void*);
+static void *task_update(struct task_t*, void*);
 static void *thread_pool(void*);
 static void usage(void);
 static void version(void);
@@ -553,44 +554,6 @@ int archive_extract_file(const struct response_t *file)
 	return r;
 }
 
-char *aur_vurlf(const char *urlpath_format, va_list ap) {
-	int len;
-	va_list aq;
-	char *out, *p;
-
-	va_copy(aq, ap);
-
-	len = strlen("https://") + strlen(arg_aur_domain) + strlen("/") +
-			vsnprintf(NULL, 0, urlpath_format, aq) + 1;
-
-	out = malloc(len);
-	if(out == NULL) {
-		return NULL;
-	}
-
-	p = stpcpy(stpcpy(out, "https://"), arg_aur_domain);
-	*p++ = '/';
-	p += vsprintf(p, urlpath_format, ap);
-	*p = '\0';
-
-	return out;
-}
-
-char *aur_urlf(const char *urlpath_format, ...) {
-	va_list ap;
-	char *out;
-
-	va_start(ap, urlpath_format);
-	out = aur_vurlf(urlpath_format, ap);
-	va_end(ap);
-
-	return out;
-}
-
-char *aur_build_rpc_url(const char *type, const char *escaped_arg) {
-	return aur_urlf("rpc.php?v=4&type=%s&arg=%s", type, escaped_arg);
-}
-
 int aurpkg_cmp(const void *p1, const void *p2)
 {
 	const aurpkg_t *pkg1 = p1;
@@ -787,7 +750,7 @@ size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream)
 	return realsize;
 }
 
-void *download(CURL *curl, void *arg)
+void *download(struct task_t *task, void *arg)
 {
 	alpm_list_t *queryresult = NULL;
 	aurpkg_t *result;
@@ -797,9 +760,9 @@ void *download(CURL *curl, void *arg)
 	long httpcode;
 	struct response_t response = { 0, 0 };
 
-	curl = curl_init_easy_handle(curl);
+	task->curl = curl_init_easy_handle(task->curl);
 
-	queryresult = task_query(curl, arg);
+	queryresult = task_query(task, arg);
 	if(!queryresult) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
 		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", (const char*)arg);
@@ -815,16 +778,16 @@ void *download(CURL *curl, void *arg)
 		return NULL;
 	}
 
-	curl_easy_setopt(curl, CURLOPT_ENCODING, "identity"); /* disable compression */
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_response);
+	curl_easy_setopt(task->curl, CURLOPT_ENCODING, "identity"); /* disable compression */
+	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, &response);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_write_response);
 
 	result = queryresult->data;
-	url = aur_urlf("%s", result->urlpath);
-	curl_easy_setopt(curl, CURLOPT_URL, url);
+	url = aur_build_url(task->aur, result->urlpath);
+	curl_easy_setopt(task->curl, CURLOPT_URL, url);
 
 	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char*)arg, url);
-	curlstat = curl_easy_perform(curl);
+	curlstat = curl_easy_perform(task->curl);
 
 	if(curlstat != CURLE_OK) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
@@ -832,7 +795,7 @@ void *download(CURL *curl, void *arg)
 		goto finish;
 	}
 
-	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
+	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &httpcode);
 	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
 
 	if(httpcode != 200) {
@@ -855,7 +818,7 @@ void *download(CURL *curl, void *arg)
 			colstr.pkg, result->name, colstr.nc, cfg.dlpath);
 
 	if(cfg.getdeps) {
-		resolve_pkg_dependencies(curl, result);
+		resolve_pkg_dependencies(task, result);
 	}
 
 finish:
@@ -2018,7 +1981,7 @@ void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
 	}
 }
 
-void resolve_one_dep(CURL *curl, const char *depend) {
+void resolve_one_dep(struct task_t *task, const char *depend) {
 	char *sanitized = strdup(depend);
 
 	sanitized[strcspn(sanitized, "<>=")] = '\0';
@@ -2043,7 +2006,7 @@ void resolve_one_dep(CURL *curl, const char *depend) {
 			if(!pkg_is_binary(depend)) {
 				void *retval;
 
-				retval = task_download(curl, sanitized);
+				retval = task_download(task, sanitized);
 				alpm_list_free_inner(retval, aurpkg_free);
 				alpm_list_free(retval);
 			}
@@ -2053,15 +2016,15 @@ void resolve_one_dep(CURL *curl, const char *depend) {
 	return;
 }
 
-int resolve_pkg_dependencies(CURL *curl, aurpkg_t *package) {
+int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
 	alpm_list_t *i;
 
 	for(i = package->depends; i; i = i->next) {
-		resolve_one_dep(curl, i->data);
+		resolve_one_dep(task, i->data);
 	}
 
 	for(i = package->makedepends; i; i = i->next) {
-		resolve_one_dep(curl, i->data);
+		resolve_one_dep(task, i->data);
 	}
 
 	return 0;
@@ -2167,16 +2130,16 @@ size_t strtrim(char *str)
 	return right - left;
 }
 
-void *task_download(CURL *curl, void *arg)
+void *task_download(struct task_t *task, void *arg)
 {
 	if(pkg_is_binary(arg)) {
 		return NULL;
 	} else {
-		return download(curl, arg);
+		return download(task, arg);
 	}
 }
 
-void *task_query(CURL *curl, void *arg)
+void *task_query(struct task_t *task, void *arg)
 {
 	alpm_list_t *pkglist = NULL;
 	CURLcode curlstat;
@@ -2223,22 +2186,22 @@ void *task_query(CURL *curl, void *arg)
 	memset(&json_parser, 0, sizeof(json_parser_t));
 	yajl_hand = yajl_alloc(&callbacks, NULL, &json_parser);
 
-	curl = curl_init_easy_handle(curl);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, yajl_parse_stream);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, yajl_hand);
+	task->curl = curl_init_easy_handle(task->curl);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, yajl_parse_stream);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, yajl_hand);
 
 	escaped = curl_easy_escape(NULL, argstr, span);
 	if(cfg.opmask & OP_SEARCH) {
-		url = aur_build_rpc_url("search", escaped);
+		url = aur_build_rpc_url(task->aur, "search", escaped);
 	} else if(cfg.opmask & OP_MSEARCH) {
-		url = aur_build_rpc_url("msearch", escaped);
+		url = aur_build_rpc_url(task->aur, "msearch", escaped);
 	} else {
-		url = aur_build_rpc_url("info", escaped);
+		url = aur_build_rpc_url(task->aur, "info", escaped);
 	}
-	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(task->curl, CURLOPT_URL, url);
 
 	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char *)arg, url);
-	curlstat = curl_easy_perform(curl);
+	curlstat = curl_easy_perform(task->curl);
 
 	if(curlstat != CURLE_OK) {
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", (const char*)arg,
@@ -2246,7 +2209,7 @@ void *task_query(CURL *curl, void *arg)
 		goto finish;
 	}
 
-	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpcode);
+	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &httpcode);
 	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
 	if(httpcode >= 400) {
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
@@ -2269,7 +2232,7 @@ finish:
 	return pkglist;
 }
 
-void *task_update(CURL *curl, void *arg)
+void *task_update(struct task_t *task, void *arg)
 {
 	alpm_pkg_t *pmpkg;
 	aurpkg_t *aurpkg;
@@ -2279,7 +2242,7 @@ void *task_update(CURL *curl, void *arg)
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
 			colstr.pkg, candidate, colstr.nc);
 
-	qretval = task_query(curl, arg);
+	qretval = task_query(task, arg);
 	aurpkg = qretval ? ((alpm_list_t*)qretval)->data : NULL;
 	if(aurpkg) {
 
@@ -2304,7 +2267,7 @@ void *task_update(CURL *curl, void *arg)
 
 			if(cfg.opmask & OP_DOWNLOAD) {
 				/* we don't care about the return, but we do care about leaks */
-				dlretval = task_download(curl, (void*)aurpkg->name);
+				dlretval = task_download(task, (void*)aurpkg->name);
 				alpm_list_free_inner(dlretval, aurpkg_free);
 				alpm_list_free(dlretval);
 			} else {
@@ -2331,12 +2294,11 @@ finish:
 void *thread_pool(void *arg)
 {
 	alpm_list_t *ret = NULL;
-	CURL *curl;
 	void *job;
-	struct task_t *task = arg;
+	struct task_t task = *(struct task_t *)arg;
 
-	curl = curl_easy_init();
-	if(!curl) {
+	task.curl = curl_easy_init();
+	if(!task.curl) {
 		cwr_fprintf(stderr, LOG_ERROR, "curl: failed to initialize handle\n");
 		return NULL;
 	}
@@ -2357,10 +2319,10 @@ void *thread_pool(void *arg)
 			break;
 		}
 
-		ret = alpm_list_join(ret, task->threadfn(curl, job));
+		ret = alpm_list_join(ret, task.threadfn(&task, job));
 	}
 
-	curl_easy_cleanup(curl);
+	curl_easy_cleanup(task.curl);
 
 	return ret;
 }
@@ -2464,9 +2426,7 @@ int main(int argc, char *argv[]) {
 	int ret, n, num_threads;
 	pthread_t *threads;
 	void (*printfn)(aurpkg_t*) = NULL;
-	struct task_t task = {
-		.threadfn = task_query
-	};
+	struct task_t task;
 
 	setlocale(LC_ALL, "");
 
@@ -2489,6 +2449,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	if(parse_configfile() != 0) {
+		return 1;
+	}
+
+	ret = aur_new("https", arg_aur_domain, &task.aur);
+	if (ret < 0) {
+		fprintf(stderr, "error: aur_new failed: %s\n", strerror(-ret));
 		return 1;
 	}
 
@@ -2567,8 +2533,10 @@ int main(int argc, char *argv[]) {
 	if(cfg.opmask & OP_UPDATE) {
 		task.threadfn = task_update;
 	} else if(cfg.opmask & OP_INFO) {
+		task.threadfn = task_query;
 		printfn = cfg.format ? print_pkg_formatted : print_pkg_info;
 	} else if(cfg.opmask & (OP_SEARCH|OP_MSEARCH)) {
+		task.threadfn = task_query;
 		printfn = cfg.format ? print_pkg_formatted : print_pkg_search;
 	} else if(cfg.opmask & OP_DOWNLOAD) {
 		task.threadfn = task_download;
