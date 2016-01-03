@@ -1428,7 +1428,7 @@ int parse_configfile(void)
 				} else if(streq(val, "never")) {
 					cfg.color = 0;
 				} else {
-					fprintf(stderr, "error: invalid option to Color\n");
+					fprintf(stderr, "error: invalid option to Color: %s\n", val);
 					return 1;
 				}
 			}
