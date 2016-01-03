@@ -231,7 +231,7 @@ static aurpkg_t *aurpkg_dup(const aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(aurpkg_t*);
 static CURL *curl_init_easy_handle(CURL*);
-static size_t curl_write_response(void*, size_t, size_t, void*);
+static size_t curl_buffer_response(void*, size_t, size_t, void*);
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
@@ -729,23 +729,23 @@ CURL *curl_init_easy_handle(CURL *handle)
 	return handle;
 }
 
-size_t curl_write_response(void *ptr, size_t size, size_t nmemb, void *stream)
+size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	void *newdata;
-	size_t realsize = size * nmemb;
-	struct response_t *mem = stream;
+	char *newdata;
+	const size_t realsize = size * nmemb;
+	struct response_t *mem = userdata;
 
-	newdata = realloc(mem->data, mem->size + realsize + 1);
-	if(newdata) {
-		mem->data = newdata;
-		memcpy(&(mem->data[mem->size]), ptr, realsize);
-		mem->size += realsize;
-		mem->data[mem->size] = '\0';
-	} else {
+	newdata = realloc(mem->data, mem->size + realsize);
+	if(!newdata) {
 		cwr_fprintf(stderr, LOG_ERROR, "failed to reallocate %zd bytes\n",
-				mem->size + realsize + 1);
+				mem->size + realsize);
 		return 0;
 	}
+
+	memcpy(newdata + mem->size, ptr, realsize);
+
+	mem->data = newdata;
+	mem->size += realsize;
 
 	return realsize;
 }
@@ -780,7 +780,7 @@ void *download(struct task_t *task, void *arg)
 
 	curl_easy_setopt(task->curl, CURLOPT_ENCODING, "identity"); /* disable compression */
 	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, &response);
-	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_write_response);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
 
 	result = queryresult->data;
 	url = aur_build_url(task->aur, result->urlpath);
