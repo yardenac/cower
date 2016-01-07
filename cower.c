@@ -323,7 +323,6 @@ static alpm_list_t *workq;
 static pthread_mutex_t *openssl_lock;
 static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
 
-static const int kUnset = -1;
 static const int kThreadDefault = 10;
 static const int kInfoIndent = 17;
 static const int kSearchIndent = 4;
@@ -1341,11 +1340,9 @@ int parse_configfile(void)
 				cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
 			}
 		} else if(streq(key, "IgnoreOOD")) {
-			if(cfg.ignoreood == kUnset) {
-				cfg.ignoreood = 1;
-			}
+			cfg.ignoreood = 1;
 		} else if(streq(key, "TargetDir")) {
-			if(val && !cfg.dlpath) {
+			if(val) {
 				wordexp_t p;
 				if(wordexp(val, &p, 0) == 0) {
 					if(p.we_wordc == 1) {
@@ -1363,7 +1360,7 @@ int parse_configfile(void)
 				}
 			}
 		} else if(streq(key, "MaxThreads")) {
-			if(val && cfg.maxthreads == kUnset) {
+			if(val) {
 				cfg.maxthreads = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.maxthreads <= 0) {
 					fprintf(stderr, "error: invalid option to MaxThreads: %s\n", val);
@@ -1371,7 +1368,7 @@ int parse_configfile(void)
 				}
 			}
 		} else if(streq(key, "ConnectTimeout")) {
-			if(val && cfg.timeout == kUnset) {
+			if(val) {
 				cfg.timeout = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.timeout < 0) {
 					fprintf(stderr, "error: invalid option to ConnectTimeout: %s\n", val);
@@ -1379,21 +1376,15 @@ int parse_configfile(void)
 				}
 			}
 		} else if(streq(key, "Color")) {
-			if(cfg.color == kUnset) {
-				if(!val || streq(val, "auto")) {
-					if(isatty(fileno(stdout))) {
-						cfg.color = 1;
-					} else {
-						cfg.color = 0;
-					}
-				} else if(streq(val, "always")) {
-					cfg.color = 1;
-				} else if(streq(val, "never")) {
-					cfg.color = 0;
-				} else {
-					fprintf(stderr, "error: invalid option to Color: %s\n", val);
-					return 1;
-				}
+			if(!val || streq(val, "auto")) {
+				cfg.color = isatty(fileno(stdout));
+			} else if(streq(val, "always")) {
+				cfg.color = 1;
+			} else if(streq(val, "never")) {
+				cfg.color = 0;
+			} else {
+				fprintf(stderr, "error: invalid option to Color: %s\n", val);
+				return 1;
 			}
 		} else {
 			fprintf(stderr, "ignoring unknown option: %s\n", key);
@@ -2430,21 +2421,23 @@ int main(int argc, char *argv[]) {
 	setlocale(LC_ALL, "");
 
 	/* initialize config */
-	cfg.color = cfg.timeout = kUnset;
+	cfg.color = 0;
+	cfg.timeout = kTimeoutDefault;
 	cfg.delim = kListDelim;
 	cfg.maxthreads = kThreadDefault;
 	cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
-	cfg.ignoreood = kUnset;
+	cfg.ignoreood = 0;
 	cfg.sort_fn = aurpkg_cmpname;
 	cfg.sortorder = SORT_FORWARD;
 
-	ret = parse_options(argc, argv);
-	if(ret != 0) {
+	ret = parse_configfile();
+	if (ret != 0) {
 		return ret;
 	}
 
-	if(parse_configfile() != 0) {
-		return 1;
+	ret = parse_options(argc, argv);
+	if (ret != 0) {
+		return ret;
 	}
 
 	ret = aur_new("https", arg_aur_domain, &task.aur);
@@ -2452,11 +2445,6 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "error: aur_new failed: %s\n", strerror(-ret));
 		return 1;
 	}
-
-	/* fallback from sentinel values */
-	cfg.timeout = cfg.timeout == kUnset ? kTimeoutDefault : cfg.timeout;
-	cfg.color = cfg.color == kUnset ? 0 : cfg.color;
-	cfg.ignoreood = cfg.ignoreood == kUnset ? 0 : cfg.ignoreood;
 
 	if(strings_init() != 0) {
 		return 1;
