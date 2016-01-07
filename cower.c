@@ -273,7 +273,7 @@ static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static void resolve_one_dep(struct task_t *task, const char *depend);
 static int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
-static int set_working_dir(void);
+static int ch_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
 static size_t strtrim(char*);
@@ -283,7 +283,7 @@ static void *task_update(struct task_t*, void*);
 static void *thread_pool(void*);
 static void usage(void);
 static void version(void);
-static size_t yajl_parse_stream(void*, size_t, size_t, void*);
+static size_t json_parse_stream(void*, size_t, size_t, void*);
 
 /* runtime configuration */
 static struct {
@@ -579,7 +579,7 @@ int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 }
 
 int aurpkg_cmppopularity(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
-	double diff = pkg1->popularity - pkg2->popularity;
+	const double diff = pkg1->popularity - pkg2->popularity;
 
 	if(diff > DBL_EPSILON) {
 		return 1;
@@ -1574,6 +1574,7 @@ int parse_options(int argc, char *argv[])
 	}
 
 	if(!cfg.opmask) {
+		fprintf(stderr, "error: no operation specified (use -h for help)\n");
 		return 3;
 	}
 
@@ -2004,7 +2005,7 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 			cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
 		} else {
 			if(!pkg_is_binary(depend)) {
-				void *retval;
+				alpm_list_t *retval;
 
 				retval = task_download(task, sanitized);
 				alpm_list_free_inner(retval, aurpkg_free);
@@ -2030,7 +2031,7 @@ int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
 	return 0;
 }
 
-int set_working_dir(void)
+int ch_working_dir(void)
 {
 	char *resolved;
 
@@ -2187,7 +2188,7 @@ void *task_query(struct task_t *task, void *arg)
 	yajl_hand = yajl_alloc(&callbacks, NULL, &json_parser);
 
 	task->curl = curl_init_easy_handle(task->curl);
-	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, yajl_parse_stream);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, json_parse_stream);
 	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, yajl_hand);
 
 	escaped = curl_easy_escape(NULL, argstr, span);
@@ -2234,20 +2235,19 @@ finish:
 
 void *task_update(struct task_t *task, void *arg)
 {
-	alpm_pkg_t *pmpkg;
 	aurpkg_t *aurpkg;
-	void *dlretval, *qretval;
+	alpm_list_t *dlretval, *qretval;
 	const char *candidate = arg;
 
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
 			colstr.pkg, candidate, colstr.nc);
 
 	qretval = task_query(task, arg);
-	aurpkg = qretval ? ((alpm_list_t*)qretval)->data : NULL;
+	aurpkg = qretval ? qretval->data : NULL;
 	if(aurpkg) {
+		alpm_pkg_t *pmpkg;
 
 		pmpkg = alpm_db_get_pkg(db_local, arg);
-
 		if(!pmpkg) {
 			cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n",
 					candidate);
@@ -2294,7 +2294,7 @@ finish:
 void *thread_pool(void *arg)
 {
 	alpm_list_t *ret = NULL;
-	void *job;
+	char *job;
 	struct task_t task = *(struct task_t *)arg;
 
 	task.curl = curl_easy_init();
@@ -2378,12 +2378,11 @@ void version(void)
 	      "             Cower....\n\n", stdout);
 }
 
-size_t yajl_parse_stream(void *ptr, size_t size, size_t nmemb, void *stream)
+size_t json_parse_stream(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	struct yajl_handle_t *hand = stream;
-	size_t realsize = size * nmemb;
+	const size_t realsize = size * nmemb;
 
-	yajl_parse(hand, ptr, realsize);
+	yajl_parse(userdata, ptr, realsize);
 
 	return realsize;
 }
@@ -2424,28 +2423,24 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) {
 int main(int argc, char *argv[]) {
 	alpm_list_t *results = NULL, *thread_return = NULL;
 	int ret, n, num_threads;
-	pthread_t *threads;
+	_cleanup_free_ pthread_t *threads = NULL;
 	void (*printfn)(aurpkg_t*) = NULL;
 	struct task_t task;
 
 	setlocale(LC_ALL, "");
 
 	/* initialize config */
-	cfg.color = cfg.maxthreads = cfg.timeout = kUnset;
+	cfg.color = cfg.timeout = kUnset;
 	cfg.delim = kListDelim;
+	cfg.maxthreads = kThreadDefault;
 	cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
 	cfg.ignoreood = kUnset;
 	cfg.sort_fn = aurpkg_cmpname;
 	cfg.sortorder = SORT_FORWARD;
 
 	ret = parse_options(argc, argv);
-	switch(ret) {
-		case 0: /* everything's cool */
-			break;
-		case 3:
-			fprintf(stderr, "error: no operation specified (use -h for help)\n");
-		case 1: /* these provide their own error mesg */
-			return ret;
+	if(ret != 0) {
+		return ret;
 	}
 
 	if(parse_configfile() != 0) {
@@ -2459,7 +2454,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* fallback from sentinel values */
-	cfg.maxthreads = cfg.maxthreads == kUnset ? kThreadDefault : cfg.maxthreads;
 	cfg.timeout = cfg.timeout == kUnset ? kTimeoutDefault : cfg.timeout;
 	cfg.color = cfg.color == kUnset ? 0 : cfg.color;
 	cfg.ignoreood = cfg.ignoreood == kUnset ? 0 : cfg.ignoreood;
@@ -2485,19 +2479,13 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	ret = set_working_dir();
+	ret = ch_working_dir();
 	if(ret != 0) {
 		goto finish;
 	}
 
 	cwr_printf(LOG_DEBUG, "initializing curl\n");
-	ret = curl_global_init(CURL_GLOBAL_ALL);
 	openssl_crypto_init();
-
-	if(ret != 0) {
-		cwr_fprintf(stderr, LOG_ERROR, "failed to initialize curl\n");
-		goto finish;
-	}
 
 	pmhandle = alpm_init();
 	if(!pmhandle) {
@@ -2542,7 +2530,8 @@ int main(int argc, char *argv[]) {
 		task.threadfn = task_download;
 	}
 
-	/* filthy, filthy hack: prepopulate the package cache */
+	/* hack: prepopulate the package cache to avoid potentially doing it after
+	 * thread creation. */
 	alpm_db_get_pkgcache(db_local);
 
 	for(n = 0; n < num_threads; n++) {
@@ -2558,7 +2547,6 @@ int main(int argc, char *argv[]) {
 		pthread_join(threads[n], (void**)&thread_return);
 		results = alpm_list_join(results, thread_return);
 	}
-	free(threads);
 
 	/* we need to exit with a non-zero value when:
 	 * a) search/info/download returns nothing
@@ -2579,7 +2567,8 @@ finish:
 	FREELIST(cfg.ignore.repos);
 
 	cwr_printf(LOG_DEBUG, "releasing curl\n");
-	curl_global_cleanup();
+
+	aur_free(task.aur);
 
 	cwr_printf(LOG_DEBUG, "releasing alpm\n");
 	alpm_release(pmhandle);

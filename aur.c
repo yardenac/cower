@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <curl/curl.h>
+
 static char *aur_vurlf(struct aur_t *aur, const char *urlpath_format, va_list ap) {
 	int len;
 	va_list aq;
@@ -55,6 +57,10 @@ int aur_new(const char *proto, const char *domain, struct aur_t **aur) {
 		return -EINVAL;
 	}
 
+	if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+		return -ENOSYS;
+	}
+
 	a = calloc(1, sizeof(*a));
 	if (a == NULL) {
 		return -ENOMEM;
@@ -69,5 +75,16 @@ int aur_new(const char *proto, const char *domain, struct aur_t **aur) {
 
 	*aur = a;
 	return 0;
+}
+
+void aur_free(struct aur_t *aur) {
+	if (aur == NULL) {
+		return;
+	}
+
+	curl_global_cleanup();
+
+	free(aur->urlprefix);
+	free(aur);
 }
 
