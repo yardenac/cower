@@ -272,7 +272,7 @@ static void print_pkg_search(aurpkg_t*);
 static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static void resolve_one_dep(struct task_t *task, const char *depend);
-static int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
+static void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
 static int ch_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
@@ -406,7 +406,7 @@ alpm_handle_t *alpm_init(void)
 	FILE *fp;
 	char line[PATH_MAX];
 	char *ptr, *section = NULL;
-	enum _alpm_errno_t err;
+	alpm_errno_t err;
 
 	cwr_printf(LOG_DEBUG, "initializing alpm\n");
 	pmhandle = alpm_initialize(PACMAN_ROOT, PACMAN_DBPATH, &err);
@@ -526,8 +526,7 @@ int archive_extract_file(const struct response_t *file)
 	archive_read_support_filter_all(archive);
 	archive_read_support_format_all(archive);
 
-	r = archive_read_open_memory(archive, file->data, file->size);
-	if(r != ARCHIVE_OK) {
+	if(archive_read_open_memory(archive, file->data, file->size) != ARCHIVE_OK) {
 		return archive_errno(archive);
 	}
 
@@ -553,11 +552,8 @@ int archive_extract_file(const struct response_t *file)
 	return r;
 }
 
-int aurpkg_cmp(const void *p1, const void *p2)
+int aurpkg_cmp(const void *pkg1, const void *pkg2)
 {
-	const aurpkg_t *pkg1 = p1;
-	const aurpkg_t *pkg2 = p2;
-
 	return cfg.sortorder * cfg.sort_fn(pkg1, pkg2);
 }
 
@@ -754,7 +750,7 @@ void *download(struct task_t *task, void *arg)
 	alpm_list_t *queryresult = NULL;
 	aurpkg_t *result;
 	CURLcode curlstat;
-	char *url;
+	_cleanup_free_ char *url = NULL;
 	int ret;
 	long httpcode;
 	struct response_t response = { 0, 0 };
@@ -821,7 +817,6 @@ void *download(struct task_t *task, void *arg)
 	}
 
 finish:
-	free(url);
 	free(response.data);
 
 	return queryresult;
@@ -2008,7 +2003,7 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 	return;
 }
 
-int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
+void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
 	alpm_list_t *i;
 
 	for(i = package->depends; i; i = i->next) {
@@ -2018,8 +2013,6 @@ int resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
 	for(i = package->makedepends; i; i = i->next) {
 		resolve_one_dep(task, i->data);
 	}
-
-	return 0;
 }
 
 int ch_working_dir(void)

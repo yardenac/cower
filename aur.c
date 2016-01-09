@@ -8,7 +8,7 @@
 
 #include <curl/curl.h>
 
-static char *aur_vurlf(struct aur_t *aur, const char *urlpath_format, va_list ap) {
+static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
 	int len;
 	va_list aq;
 	char *out, *p;
@@ -31,7 +31,7 @@ static char *aur_vurlf(struct aur_t *aur, const char *urlpath_format, va_list ap
 	return out;
 }
 
-static char *aur_urlf(struct aur_t *aur, const char *urlpath_format, ...) {
+static char *aur_urlf(aur_t *aur, const char *urlpath_format, ...) {
 	va_list ap;
 	char *out;
 
@@ -42,16 +42,16 @@ static char *aur_urlf(struct aur_t *aur, const char *urlpath_format, ...) {
 	return out;
 }
 
-char *aur_build_rpc_url(struct aur_t *aur, const char *method, const char *escaped_arg) {
+char *aur_build_rpc_url(aur_t *aur, const char *method, const char *escaped_arg) {
 	return aur_urlf(aur, "/rpc.php?v=%d&type=%s&arg=%s", aur->rpc_version, method, escaped_arg);
 }
 
-char *aur_build_url(struct aur_t *aur, const char *urlpath) {
+char *aur_build_url(aur_t *aur, const char *urlpath) {
 	return aur_urlf(aur, urlpath);
 }
 
-int aur_new(const char *proto, const char *domain, struct aur_t **aur) {
-	struct aur_t *a;
+int aur_new(const char *proto, const char *domain, aur_t **aur) {
+	aur_t *a;
 
 	if (proto == NULL || domain == NULL) {
 		return -EINVAL;
@@ -77,7 +77,7 @@ int aur_new(const char *proto, const char *domain, struct aur_t **aur) {
 	return 0;
 }
 
-void aur_free(struct aur_t *aur) {
+void aur_free(aur_t *aur) {
 	if (aur == NULL) {
 		return;
 	}
@@ -87,4 +87,3 @@ void aur_free(struct aur_t *aur) {
 	free(aur->urlprefix);
 	free(aur);
 }
-
