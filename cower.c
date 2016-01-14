@@ -273,6 +273,9 @@ static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static void resolve_one_dep(struct task_t *task, const char *depend);
 static void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
+static alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg);
+static alpm_list_t *rpc_info(struct task_t *task, const char *arg);
+static alpm_list_t *rpc_search(struct task_t *task, const char *arg);
 static int ch_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
@@ -757,7 +760,7 @@ void *download(struct task_t *task, void *arg)
 
 	task->curl = curl_init_easy_handle(task->curl);
 
-	queryresult = task_query(task, arg);
+	queryresult = rpc_info(task, arg);
 	if(!queryresult) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
 		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", (const char*)arg);
@@ -2124,49 +2127,12 @@ void *task_download(struct task_t *task, void *arg)
 	}
 }
 
-void *task_query(struct task_t *task, void *arg)
-{
-	alpm_list_t *pkglist = NULL;
+alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg) {
+	json_parser_t json_parser;
 	CURLcode curlstat;
-	struct yajl_handle_t *yajl_hand = NULL;
-	const char *argstr;
+	struct yajl_handle_t *yajl_hand;
 	_cleanup_free_ char *escaped = NULL, *url = NULL;
 	long httpcode;
-	int span = 0;
-	json_parser_t json_parser;
-
-	/* find a valid chunk of search string */
-	if(cfg.opmask & OP_SEARCH) {
-		for(argstr = arg; *argstr; argstr++) {
-			span = strcspn(argstr, kRegexChars);
-
-			/* given 'cow?', we can't include w in the search */
-			if(argstr[span] == '?' || argstr[span] == '*') {
-				span--;
-			}
-
-			/* a string inside [] or {} cannot be a valid span */
-			if(strchr("[{", *argstr)) {
-				argstr = strpbrk(argstr + span, "]}");
-				if(!argstr) {
-					cwr_fprintf(stderr, LOG_ERROR, "invalid regular expression: %s\n", (const char*)arg);
-					return NULL;
-				}
-				continue;
-			}
-
-			if(span >= 2) {
-				break;
-			}
-		}
-
-		if(span < 2) {
-			cwr_fprintf(stderr, LOG_ERROR, "search string '%s' too short\n", (const char*)arg);
-			return NULL;
-		}
-	} else {
-		argstr = arg;
-	}
 
 	memset(&json_parser, 0, sizeof(json_parser_t));
 	yajl_hand = yajl_alloc(&callbacks, NULL, &json_parser);
@@ -2175,14 +2141,8 @@ void *task_query(struct task_t *task, void *arg)
 	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, json_parse_stream);
 	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, yajl_hand);
 
-	escaped = curl_easy_escape(NULL, argstr, span);
-	if(cfg.opmask & OP_SEARCH) {
-		url = aur_build_rpc_url(task->aur, "search", escaped);
-	} else if(cfg.opmask & OP_MSEARCH) {
-		url = aur_build_rpc_url(task->aur, "msearch", escaped);
-	} else {
-		url = aur_build_rpc_url(task->aur, "info", escaped);
-	}
+	escaped = curl_easy_escape(NULL, arg, 0);
+	url = aur_build_rpc_url(task->aur, method, escaped);
 	curl_easy_setopt(task->curl, CURLOPT_URL, url);
 
 	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char *)arg, url);
@@ -2209,12 +2169,65 @@ void *task_query(struct task_t *task, void *arg)
 		goto finish;
 	}
 
-	pkglist = json_parser.pkglist;
-
 finish:
 	yajl_free(yajl_hand);
 
-	return pkglist;
+	return json_parser.pkglist;
+}
+
+alpm_list_t *rpc_info(struct task_t *task, const char *arg) {
+	return rpc_do(task, "info", arg);
+}
+
+alpm_list_t *rpc_search(struct task_t *task, const char *arg) {
+	int span = 0;
+	const char *argstr;
+	_cleanup_free_ char *fragment = NULL;
+
+	for(argstr = arg; *argstr; argstr++) {
+		span = strcspn(argstr, kRegexChars);
+
+		/* given 'cow?', we can't include w in the search */
+		if(argstr[span] == '?' || argstr[span] == '*') {
+			span--;
+		}
+
+		/* a string inside [] or {} cannot be a valid span */
+		if(strchr("[{", *argstr)) {
+			argstr = strpbrk(argstr + span, "]}");
+			if(!argstr) {
+				cwr_fprintf(stderr, LOG_ERROR, "invalid regular expression: %s\n", arg);
+				return NULL;
+			}
+			continue;
+		}
+
+		if(span >= 2) {
+			break;
+		}
+	}
+
+	if(span < 2) {
+		cwr_fprintf(stderr, LOG_ERROR, "search string '%s' too short\n", arg);
+		return NULL;
+	}
+
+	fragment = strndup(argstr, span);
+	if (fragment == NULL) {
+		return NULL;
+	}
+
+	return rpc_do(task, "search", fragment);
+}
+
+void *task_query(struct task_t *task, void *arg) {
+	if (cfg.opmask & OP_SEARCH) {
+		return rpc_search(task, arg);
+	} else if (cfg.opmask & OP_MSEARCH) {
+		return rpc_do(task, "msearch", arg);
+	} else {
+		return rpc_do(task, "info", arg);
+	}
 }
 
 void *task_update(struct task_t *task, void *arg)
@@ -2226,7 +2239,7 @@ void *task_update(struct task_t *task, void *arg)
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
 			colstr.pkg, candidate, colstr.nc);
 
-	qretval = task_query(task, arg);
+	qretval = rpc_info(task, arg);
 	aurpkg = qretval ? qretval->data : NULL;
 	if(aurpkg) {
 		alpm_pkg_t *pmpkg;
