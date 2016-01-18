@@ -230,7 +230,6 @@ static int aurpkg_cmp(const void*, const void*);
 static aurpkg_t *aurpkg_dup(const aurpkg_t*);
 static void aurpkg_free(void*);
 static void aurpkg_free_inner(aurpkg_t*);
-static CURL *curl_init_easy_handle(CURL*);
 static size_t curl_buffer_response(void*, size_t, size_t, void*);
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
@@ -281,6 +280,9 @@ static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
 static size_t strtrim(char*);
 static int task_http_execute(struct task_t *, const char *, const char *);
+static void task_reset(struct task_t *, const char *, void *);
+static void task_reset_for_download(struct task_t *, const char *, void *);
+static void task_reset_for_rpc(struct task_t *, const char *, void *);
 static void *task_download(struct task_t*, void*);
 static void *task_query(struct task_t*, void*);
 static void *task_update(struct task_t*, void*);
@@ -707,25 +709,35 @@ int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list arg
 	return vfprintf(stream, bufout, args);
 }
 
-CURL *curl_init_easy_handle(CURL *handle)
-{
-	if(!handle) {
-		return NULL;
-	}
+void task_reset(struct task_t *task, const char *url, void *writedata) {
+	curl_easy_reset(task->curl);
 
-	curl_easy_reset(handle);
-	curl_easy_setopt(handle, CURLOPT_USERAGENT, kCowerUserAgent);
-	curl_easy_setopt(handle, CURLOPT_ENCODING, "deflate, gzip");
-	curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, cfg.timeout);
-	curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+	curl_easy_setopt(task->curl, CURLOPT_URL, url);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, writedata);
+	curl_easy_setopt(task->curl, CURLOPT_USERAGENT, kCowerUserAgent);
+	curl_easy_setopt(task->curl, CURLOPT_CONNECTTIMEOUT, cfg.timeout);
+	curl_easy_setopt(task->curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-	/* This is required of multi-threaded apps using timeouts. See
-	 * curl_easy_setopt(3) */
+	/* Required for multi-threaded apps using timeouts. See
+	 * CURLOPT_NOSIGNAL(3) */
 	if(cfg.timeout > 0L) {
-		curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1L);
+		curl_easy_setopt(task->curl, CURLOPT_NOSIGNAL, 1L);
 	}
+}
 
-	return handle;
+void task_reset_for_rpc(struct task_t *task, const char *url, void *writedata) {
+	task_reset(task, url, writedata);
+
+	curl_easy_setopt(task->curl, CURLOPT_ACCEPT_ENCODING, "deflate, gzip");
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, json_parse_stream);
+}
+
+void task_reset_for_download(struct task_t *task, const char *url, void *writedata) {
+	task_reset(task, url, writedata);
+
+	/* disable compression, since downloads are compressed tarballs */
+	curl_easy_setopt(task->curl, CURLOPT_ACCEPT_ENCODING, "identity");
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
 }
 
 size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata)
@@ -802,12 +814,7 @@ void *download(struct task_t *task, const char *package)
 	result = queryresult->data;
 	url = aur_build_url(task->aur, result->urlpath);
 
-	task->curl = curl_init_easy_handle(task->curl);
-	curl_easy_setopt(task->curl, CURLOPT_URL, url);
-	curl_easy_setopt(task->curl, CURLOPT_ENCODING, "identity"); /* disable compression */
-	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, &response);
-	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
-
+	task_reset_for_download(task, url, &response);
 	if (task_http_execute(task, url, package) != 0) {
 		goto finish;
 	}
@@ -2138,33 +2145,29 @@ void *task_download(struct task_t *task, void *arg)
 
 alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg) {
 	json_parser_t json_parser;
-	struct yajl_handle_t *yajl_hand;
+	struct yajl_handle_t *yajl;
 	_cleanup_free_ char *escaped = NULL, *url = NULL;
 
 	memset(&json_parser, 0, sizeof(json_parser_t));
-	yajl_hand = yajl_alloc(&callbacks, NULL, &json_parser);
-
-	task->curl = curl_init_easy_handle(task->curl);
-	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, json_parse_stream);
-	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, yajl_hand);
+	yajl = yajl_alloc(&callbacks, NULL, &json_parser);
 
 	escaped = curl_easy_escape(NULL, arg, 0);
 	url = aur_build_rpc_url(task->aur, method, escaped);
-	curl_easy_setopt(task->curl, CURLOPT_URL, url);
 
+	task_reset_for_rpc(task, url, yajl);
 	if (task_http_execute(task, url, arg) != 0) {
 		goto finish;
 	}
 
-	yajl_complete_parse(yajl_hand);
-	if(json_parser.error) {
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: query failed: %s\n",
-				(const char*)arg, json_parser.error);
+	yajl_complete_parse(yajl);
+	if (json_parser.error) {
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: query failed: %s\n", arg,
+				json_parser.error);
 		goto finish;
 	}
 
 finish:
-	yajl_free(yajl_hand);
+	yajl_free(yajl);
 
 	return json_parser.pkglist;
 }
