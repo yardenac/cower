@@ -280,6 +280,7 @@ static int ch_working_dir(void);
 static int strings_init(void);
 static const struct key_t *string_to_key(const unsigned char *key, size_t len);
 static size_t strtrim(char*);
+static int task_http_execute(struct task_t *, const char *, const char *);
 static void *task_download(struct task_t*, void*);
 static void *task_query(struct task_t*, void*);
 static void *task_update(struct task_t*, void*);
@@ -748,14 +749,38 @@ size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata
 	return realsize;
 }
 
+int task_http_execute(struct task_t *task, const char *url, const char *arg) {
+	CURLcode r;
+	long response_code;
+
+	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", arg, url);
+
+	r = curl_easy_perform(task->curl);
+	if (r != CURLE_OK) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", arg);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", arg, curl_easy_strerror(r));
+		return 1;
+	}
+
+	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &response_code);
+	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", arg, response_code);
+
+	if(response_code != 200) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", arg);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
+				arg, response_code);
+		return 1;
+	}
+
+	return 0;
+}
+
 void *download(struct task_t *task, const char *package)
 {
 	alpm_list_t *queryresult = NULL;
 	aurpkg_t *result;
-	CURLcode curlstat;
 	_cleanup_free_ char *url = NULL;
 	int ret;
-	long httpcode;
 	struct response_t response = { 0, 0 };
 
 	queryresult = rpc_info(task, package);
@@ -783,22 +808,7 @@ void *download(struct task_t *task, const char *package)
 	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, &response);
 	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
 
-	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", package, url);
-	curlstat = curl_easy_perform(task->curl);
-
-	if(curlstat != CURLE_OK) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", package, curl_easy_strerror(curlstat));
-		goto finish;
-	}
-
-	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &httpcode);
-	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", package, httpcode);
-
-	if(httpcode != 200) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
-				package, httpcode);
+	if (task_http_execute(task, url, package) != 0) {
 		goto finish;
 	}
 
@@ -2128,10 +2138,8 @@ void *task_download(struct task_t *task, void *arg)
 
 alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg) {
 	json_parser_t json_parser;
-	CURLcode curlstat;
 	struct yajl_handle_t *yajl_hand;
 	_cleanup_free_ char *escaped = NULL, *url = NULL;
-	long httpcode;
 
 	memset(&json_parser, 0, sizeof(json_parser_t));
 	yajl_hand = yajl_alloc(&callbacks, NULL, &json_parser);
@@ -2144,20 +2152,7 @@ alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg) {
 	url = aur_build_rpc_url(task->aur, method, escaped);
 	curl_easy_setopt(task->curl, CURLOPT_URL, url);
 
-	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char *)arg, url);
-	curlstat = curl_easy_perform(task->curl);
-
-	if(curlstat != CURLE_OK) {
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", (const char*)arg,
-				curl_easy_strerror(curlstat));
-		goto finish;
-	}
-
-	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &httpcode);
-	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
-	if(httpcode >= 400) {
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
-				(const char*)arg, httpcode);
+	if (task_http_execute(task, url, arg) != 0) {
 		goto finish;
 	}
 
