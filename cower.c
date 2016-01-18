@@ -236,7 +236,7 @@ static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((forma
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
 static alpm_list_t *dedupe_results(alpm_list_t *list);
-static void *download(struct task_t *task, void*);
+static void *download(struct task_t *task, const char*);
 static alpm_list_t *filter_results(alpm_list_t*);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
@@ -748,7 +748,7 @@ size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata
 	return realsize;
 }
 
-void *download(struct task_t *task, void *arg)
+void *download(struct task_t *task, const char *package)
 {
 	alpm_list_t *queryresult = NULL;
 	aurpkg_t *result;
@@ -758,56 +758,55 @@ void *download(struct task_t *task, void *arg)
 	long httpcode;
 	struct response_t response = { 0, 0 };
 
-	task->curl = curl_init_easy_handle(task->curl);
-
-	queryresult = rpc_info(task, arg);
+	queryresult = rpc_info(task, package);
 	if(!queryresult) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", (const char*)arg);
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
+		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", package);
 		return NULL;
 	}
 
-	if(access(arg, F_OK) == 0 && !cfg.force) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+	if(access(package, F_OK) == 0 && !cfg.force) {
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
-				cfg.dlpath, (const char*)arg);
+				cfg.dlpath, package);
 		alpm_list_free_inner(queryresult, aurpkg_free);
 		alpm_list_free(queryresult);
 		return NULL;
 	}
 
+	result = queryresult->data;
+	url = aur_build_url(task->aur, result->urlpath);
+
+	task->curl = curl_init_easy_handle(task->curl);
+	curl_easy_setopt(task->curl, CURLOPT_URL, url);
 	curl_easy_setopt(task->curl, CURLOPT_ENCODING, "identity"); /* disable compression */
 	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, &response);
 	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
 
-	result = queryresult->data;
-	url = aur_build_url(task->aur, result->urlpath);
-	curl_easy_setopt(task->curl, CURLOPT_URL, url);
-
-	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", (const char*)arg, url);
+	cwr_printf(LOG_DEBUG, "[%s]: curl_easy_perform %s\n", package, url);
 	curlstat = curl_easy_perform(task->curl);
 
 	if(curlstat != CURLE_OK) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", (const char*)arg, curl_easy_strerror(curlstat));
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", package, curl_easy_strerror(curlstat));
 		goto finish;
 	}
 
 	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &httpcode);
-	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", (const char *)arg, httpcode);
+	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", package, httpcode);
 
 	if(httpcode != 200) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
-				(const char*)arg, httpcode);
+				package, httpcode);
 		goto finish;
 	}
 
 	ret = archive_extract_file(&response);
 	if(ret != 0) {
-		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", (const char*)arg);
+		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
-				(const char*)arg, strerror(ret));
+				package, strerror(ret));
 		goto finish;
 	}
 
