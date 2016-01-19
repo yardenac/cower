@@ -337,6 +337,8 @@ static const long kTimeoutDefault = 10;
 static const char kListDelim[] = "  ";
 static const char kCowerUserAgent[] = "cower/" COWER_VERSION;
 static const char kRegexChars[] = "^.+*?$[](){}|\\";
+static char const *kDigits = "0123456789";
+static char const *kPrintfFlags = "'-+ #0I";
 
 static yajl_callbacks callbacks = {
 	NULL,             /* null */
@@ -352,8 +354,6 @@ static yajl_callbacks callbacks = {
 	NULL,             /* end_array */
 };
 
-static char const *digits = "0123456789";
-static char const *printf_flags = "'-+ #0I";
 
 /* list must be sorted by the string value */
 static const struct key_t json_keys[] = {
@@ -1773,8 +1773,8 @@ void print_pkg_formatted(aurpkg_t *pkg)
 	for(p = cfg.format; *p; p++) {
 		len = 0;
 		if(*p == '%') {
-			len = strspn(p + 1 + len, printf_flags);
-			len += strspn(p + 1 + len, digits);
+			len = strspn(p + 1 + len, kPrintfFlags);
+			len += strspn(p + 1 + len, kDigits);
 			snprintf(fmt, len + 3, "%ss", p);
 			fmt[len + 1] = 's';
 			p += len + 1;
