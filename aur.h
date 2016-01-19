@@ -1,3 +1,6 @@
+#ifndef AUR_H
+#define AUR_H
+
 #include <curl/curl.h>
 
 struct aur_t {
@@ -12,3 +15,5 @@ void aur_free(aur_t *aur);
 
 char *aur_build_rpc_url(aur_t *aur, const char *method, const char *arg);
 char *aur_build_url(aur_t *aur, const char *urlpath);
+
+#endif  /* AUR_H */

@@ -3,9 +3,9 @@
 OUT        = cower
 VERSION    = $(shell git describe)
 
-SRC        = cower.c aur.c
+SRC        = cower.c aur.c package.c
 OBJ        = $(SRC:.c=.o)
-DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c aur.c aur.h
+DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c aur.c aur.h package.c package.h
 
 PREFIX    ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man

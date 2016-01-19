@@ -51,6 +51,7 @@
 #include <yajl/yajl_parse.h>
 
 #include "aur.h"
+#include "package.h"
 
 /* macros */
 #define UNUSED                __attribute__((unused))
@@ -132,19 +133,6 @@ enum {
 	SORT_REVERSE = -1
 };
 
-enum json_key_type_t {
-	JSON_KEY_METADATA,
-	JSON_KEY_PACKAGE_ATTR,
-};
-typedef enum json_key_type_t json_key_type_t;
-
-struct key_t {
-	const char *name;
-	json_key_type_t type;
-	int multivalued;
-	size_t offset;
-};
-
 struct strings_t {
 	const char *error;
 	const char *warn;
@@ -157,57 +145,16 @@ struct strings_t {
 	const char *nc;
 };
 
-struct aurpkg_t {
-	char *desc;
-	char *maint;
-	char *name;
-	char *pkgbase;
-	char *url;
-	char *urlpath;
-	char *ver;
-
-	int cat;
-	int id;
-	int pkgbaseid;
-	int ood;
-	int votes;
-	double popularity;
-	time_t firstsub;
-	time_t lastmod;
-
-	alpm_list_t *licenses;
-	alpm_list_t *conflicts;
-	alpm_list_t *depends;
-	alpm_list_t *groups;
-	alpm_list_t *makedepends;
-	alpm_list_t *optdepends;
-	alpm_list_t *checkdepends;
-	alpm_list_t *provides;
-	alpm_list_t *replaces;
-};
-typedef struct aurpkg_t aurpkg_t;
-
-struct json_parser_t {
-	const struct key_t *key;
-	int depth;
-
-	int resultcount;
-	alpm_list_t *pkglist;
-	aurpkg_t aurpkg;
-
-	char *error;
-};
-typedef struct json_parser_t json_parser_t;
-
 struct response_t {
 	char *data;
 	size_t size;
+	size_t capacity;
 };
 
 struct task_t {
 	struct aur_t *aur;
 	CURL *curl;
-	void *(*threadfn)(struct task_t*, void*);
+	aurpkg_t **(*threadfn)(struct task_t*, void*);
 };
 
 /* function prototypes */
@@ -227,31 +174,19 @@ static int aurpkg_cmplastmod(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmp(const void*, const void*);
-static aurpkg_t *aurpkg_dup(const aurpkg_t*);
-static void aurpkg_free(void*);
-static void aurpkg_free_inner(aurpkg_t*);
 static size_t curl_buffer_response(void*, size_t, size_t, void*);
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
-static alpm_list_t *dedupe_results(alpm_list_t *list);
-static void *download(struct task_t *task, const char*);
-static alpm_list_t *filter_results(alpm_list_t*);
+static aurpkg_t **dedupe_results(aurpkg_t **list);
+static aurpkg_t **download(struct task_t *task, const char*);
+static void filter_results(aurpkg_t **);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static int get_config_path(char *config_path, size_t pathlen);
 static int globcompare(const void *a, const void *b);
+static int have_results(aurpkg_t **packages);
 static void indentprint(const char*, int);
-static int json_end_map(void*);
-static void *json_get_valueptr(json_parser_t *parser);
-static int json_integer(void *ctx, long long);
-static int json_double(void *ctx, double);
-static int json_map_key(void*, const unsigned char*, size_t);
-static int json_start_map(void*);
-static int json_string(void*, const unsigned char*, size_t);
-static int json_string_multivalued(alpm_list_t **dest, const unsigned char *data, size_t size);
-static int json_string_singlevalued(char **dest, const unsigned char *data, size_t size);
-static int keycmp(const void *v1, const void *v2);
 static alpm_list_t *load_targets_from_files(alpm_list_t *files);
 static void openssl_crypto_cleanup(void);
 static void openssl_crypto_init(void);
@@ -264,32 +199,31 @@ static int parse_keyname(char*);
 static int pkg_is_binary(const char *pkg);
 static void pkgbuild_get_depends(char*, alpm_list_t**);
 static int print_escaped(const char*);
-static void print_extinfo_list(alpm_list_t*, const char*, const char*, int);
+static void print_extinfo_list(char **, const char*, const char*, int);
 static void print_pkg_formatted(aurpkg_t*);
 static void print_pkg_info(aurpkg_t*);
 static void print_pkg_search(aurpkg_t*);
-static void print_results(alpm_list_t*, void (*)(aurpkg_t*));
+static void print_results(aurpkg_t **, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static void resolve_one_dep(struct task_t *task, const char *depend);
 static void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
-static alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg);
-static alpm_list_t *rpc_info(struct task_t *task, const char *arg);
-static alpm_list_t *rpc_search(struct task_t *task, const char *arg);
+static aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg);
+static aurpkg_t **rpc_info(struct task_t *task, const char *arg);
+static aurpkg_t **rpc_search(struct task_t *task, const char *arg);
 static int ch_working_dir(void);
+static int should_ignore_package(const aurpkg_t *package, regex_t *pattern);
 static int strings_init(void);
-static const struct key_t *string_to_key(const unsigned char *key, size_t len);
 static size_t strtrim(char*);
 static int task_http_execute(struct task_t *, const char *, const char *);
 static void task_reset(struct task_t *, const char *, void *);
 static void task_reset_for_download(struct task_t *, const char *, void *);
 static void task_reset_for_rpc(struct task_t *, const char *, void *);
-static void *task_download(struct task_t*, void*);
-static void *task_query(struct task_t*, void*);
-static void *task_update(struct task_t*, void*);
+static aurpkg_t **task_download(struct task_t*, void*);
+static aurpkg_t **task_query(struct task_t*, void*);
+static aurpkg_t **task_update(struct task_t*, void*);
 static void *thread_pool(void*);
 static void usage(void);
 static void version(void);
-static size_t json_parse_stream(void*, size_t, size_t, void*);
 
 /* runtime configuration */
 static struct {
@@ -340,51 +274,6 @@ static const char kRegexChars[] = "^.+*?$[](){}|\\";
 static char const *kDigits = "0123456789";
 static char const *kPrintfFlags = "'-+ #0I";
 
-static yajl_callbacks callbacks = {
-	NULL,             /* null */
-	NULL,             /* boolean */
-	json_integer,     /* integer */
-	json_double,      /* double */
-	NULL,             /* number */
-	json_string,      /* string */
-	json_start_map,   /* start_map */
-	json_map_key,     /* map_key */
-	json_end_map,     /* end_map */
-	NULL,             /* start_array */
-	NULL,             /* end_array */
-};
-
-
-/* list must be sorted by the string value */
-static const struct key_t json_keys[] = {
-	{ "CheckDepends",   JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, checkdepends) },
-	{ "Conflicts",      JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, conflicts) },
-	{ "Depends",        JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, depends) },
-	{ "Description",    JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, desc) },
-	{ "FirstSubmitted", JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, firstsub) },
-	{ "Groups",         JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, groups) },
-	{ "ID",             JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, id) },
-	{ "LastModified",   JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, lastmod) },
-	{ "License",        JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, licenses) },
-	{ "Maintainer",     JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, maint) },
-	{ "MakeDepends",    JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, makedepends) },
-	{ "Name",           JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, name) },
-	{ "NumVotes",       JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, votes) },
-	{ "OptDepends",     JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, optdepends) },
-	{ "OutOfDate",      JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, ood) },
-	{ "PackageBase",    JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, pkgbase) },
-	{ "PackageBaseID",  JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, pkgbaseid) },
-	{ "Popularity",     JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, popularity) },
-	{ "Provides",       JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, provides) },
-	{ "Replaces",       JSON_KEY_PACKAGE_ATTR, 1, offsetof(aurpkg_t, replaces) },
-	{ "URL",            JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, url) },
-	{ "URLPath",        JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, urlpath) },
-	{ "Version",        JSON_KEY_PACKAGE_ATTR, 0, offsetof(aurpkg_t, ver) },
-	{ "error",          JSON_KEY_METADATA, 0, offsetof(json_parser_t, error) },
-	{ "resultcount",    JSON_KEY_METADATA, 0, offsetof(json_parser_t, resultcount) },
-	{ "results",        JSON_KEY_METADATA, 0, 0 },
-};
-
 static struct strings_t colstr = {
 	.error = "error:",
 	.warn = "warning:",
@@ -407,6 +296,7 @@ int startswith(const char *s1, const char *s2)
 	return strncmp(s1, s2, strlen(s2)) == 0;
 }
 
+/* TODO: handle includes. maybe use pkgfile's parser as a starting point. */
 alpm_handle_t *alpm_init(void)
 {
 	FILE *fp;
@@ -526,7 +416,7 @@ int archive_extract_file(const struct response_t *file)
 	struct archive *archive;
 	struct archive_entry *entry;
 	const int archive_flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME;
-	int r;
+	int r = 0;
 
 	archive = archive_read_new();
 	archive_read_support_filter_all(archive);
@@ -558,9 +448,12 @@ int archive_extract_file(const struct response_t *file)
 	return r;
 }
 
-int aurpkg_cmp(const void *pkg1, const void *pkg2)
+int aurpkg_cmp(const void *a, const void *b)
 {
-	return cfg.sortorder * cfg.sort_fn(pkg1, pkg2);
+	const aurpkg_t * const *pkg1 = a;
+	const aurpkg_t * const *pkg2 = b;
+
+	return cfg.sortorder * cfg.sort_fn(*pkg1, *pkg2);
 }
 
 int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
@@ -568,11 +461,11 @@ int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 }
 
 int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
-	return alpm_pkg_vercmp(pkg1->ver, pkg2->ver);
+	return alpm_pkg_vercmp(pkg1->version, pkg2->version);
 }
 
 int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
-	return strcmp(pkg1->maint, pkg2->maint);
+	return strcmp(pkg1->maintainer, pkg2->maintainer);
 }
 
 int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
@@ -592,29 +485,15 @@ int aurpkg_cmppopularity(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 }
 
 int aurpkg_cmpood(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
-	return pkg1->ood - pkg2->ood;
+	return pkg1->out_of_date - pkg2->out_of_date;
 }
 
 int aurpkg_cmplastmod(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
-	return difftime(pkg1->lastmod, pkg2->lastmod);
+	return difftime(pkg1->modified_s, pkg2->modified_s);
 }
 
 int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
-	return difftime(pkg1->firstsub, pkg2->firstsub);
-}
-
-aurpkg_t *aurpkg_dup(const aurpkg_t *pkg)
-{
-	aurpkg_t *newpkg;
-
-	newpkg = malloc(sizeof(aurpkg_t));
-	return newpkg ? memcpy(newpkg, pkg, sizeof(aurpkg_t)) : NULL;
-}
-
-void aurpkg_free(void *pkg)
-{
-	aurpkg_free_inner(pkg);
-	free(pkg);
+	return difftime(pkg1->submitted_s, pkg2->submitted_s);
 }
 
 int globcompare(const void *a, const void *b)
@@ -622,33 +501,20 @@ int globcompare(const void *a, const void *b)
 	return fnmatch(a, b, 0);
 }
 
-void aurpkg_free_inner(aurpkg_t *pkg)
-{
-	if(!pkg) {
-		return;
+int have_results(aurpkg_t **packages) {
+	aurpkg_t **p;
+
+	if (packages == NULL) {
+		return 0;
 	}
 
-	/* free allocated string fields */
-	free(pkg->name);
-	free(pkg->maint);
-	free(pkg->ver);
-	free(pkg->urlpath);
-	free(pkg->desc);
-	free(pkg->url);
-	free(pkg->pkgbase);
+	for (p = packages; *p; p++) {
+		if (!(*p)->ignored) {
+			return 1;
+		}
+	}
 
-	/* free extended list info */
-	FREELIST(pkg->depends);
-	FREELIST(pkg->groups);
-	FREELIST(pkg->checkdepends);
-	FREELIST(pkg->makedepends);
-	FREELIST(pkg->optdepends);
-	FREELIST(pkg->provides);
-	FREELIST(pkg->conflicts);
-	FREELIST(pkg->replaces);
-	FREELIST(pkg->licenses);
-
-	memset(pkg, 0, sizeof(aurpkg_t));
+	return 0;
 }
 
 int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...)
@@ -713,6 +579,7 @@ void task_reset(struct task_t *task, const char *url, void *writedata) {
 	curl_easy_reset(task->curl);
 
 	curl_easy_setopt(task->curl, CURLOPT_URL, url);
+	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
 	curl_easy_setopt(task->curl, CURLOPT_WRITEDATA, writedata);
 	curl_easy_setopt(task->curl, CURLOPT_USERAGENT, kCowerUserAgent);
 	curl_easy_setopt(task->curl, CURLOPT_CONNECTTIMEOUT, cfg.timeout);
@@ -720,7 +587,7 @@ void task_reset(struct task_t *task, const char *url, void *writedata) {
 
 	/* Required for multi-threaded apps using timeouts. See
 	 * CURLOPT_NOSIGNAL(3) */
-	if(cfg.timeout > 0L) {
+	if (cfg.timeout > 0L) {
 		curl_easy_setopt(task->curl, CURLOPT_NOSIGNAL, 1L);
 	}
 }
@@ -729,7 +596,6 @@ void task_reset_for_rpc(struct task_t *task, const char *url, void *writedata) {
 	task_reset(task, url, writedata);
 
 	curl_easy_setopt(task->curl, CURLOPT_ACCEPT_ENCODING, "deflate, gzip");
-	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, json_parse_stream);
 }
 
 void task_reset_for_download(struct task_t *task, const char *url, void *writedata) {
@@ -737,26 +603,30 @@ void task_reset_for_download(struct task_t *task, const char *url, void *writeda
 
 	/* disable compression, since downloads are compressed tarballs */
 	curl_easy_setopt(task->curl, CURLOPT_ACCEPT_ENCODING, "identity");
-	curl_easy_setopt(task->curl, CURLOPT_WRITEFUNCTION, curl_buffer_response);
 }
 
-size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata)
-{
-	char *newdata;
+size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata) {
 	const size_t realsize = size * nmemb;
 	struct response_t *mem = userdata;
 
-	newdata = realloc(mem->data, mem->size + realsize);
-	if(!newdata) {
-		cwr_fprintf(stderr, LOG_ERROR, "failed to reallocate %zd bytes\n",
-				mem->size + realsize);
-		return 0;
+	if (mem->data == NULL || mem->capacity - realsize <= mem->size) {
+		char *newdata;
+		const size_t newcap = (mem->capacity + realsize) * 2.5;
+
+		newdata = realloc(mem->data, newcap);
+		if (newdata == NULL) {
+			cwr_fprintf(stderr, LOG_ERROR, "failed to reallocate %zd bytes\n",
+					mem->size + realsize);
+			return 0;
+		}
+
+		mem->capacity = newcap;
+		mem->data = newdata;
 	}
 
-	memcpy(newdata + mem->size, ptr, realsize);
-
-	mem->data = newdata;
+	memcpy(mem->data + mem->size, ptr, realsize);
 	mem->size += realsize;
+	mem->data[mem->size] = '\0';
 
 	return realsize;
 }
@@ -777,7 +647,7 @@ int task_http_execute(struct task_t *task, const char *url, const char *arg) {
 	curl_easy_getinfo(task->curl, CURLINFO_RESPONSE_CODE, &response_code);
 	cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", arg, response_code);
 
-	if(response_code != 200) {
+	if (response_code != 200) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", arg);
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
 				arg, response_code);
@@ -787,16 +657,15 @@ int task_http_execute(struct task_t *task, const char *url, const char *arg) {
 	return 0;
 }
 
-void *download(struct task_t *task, const char *package)
+aurpkg_t **download(struct task_t *task, const char *package)
 {
-	alpm_list_t *queryresult = NULL;
-	aurpkg_t *result;
+	aurpkg_t **result;
 	_cleanup_free_ char *url = NULL;
 	int ret;
-	struct response_t response = { 0, 0 };
+	struct response_t response = { NULL, 0, 0 };
 
-	queryresult = rpc_info(task, package);
-	if(!queryresult) {
+	result = rpc_info(task, package);
+	if(!result) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", package);
 		return NULL;
@@ -806,13 +675,11 @@ void *download(struct task_t *task, const char *package)
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
 				cfg.dlpath, package);
-		alpm_list_free_inner(queryresult, aurpkg_free);
-		alpm_list_free(queryresult);
+		aur_packages_free(result);
 		return NULL;
 	}
 
-	result = queryresult->data;
-	url = aur_build_url(task->aur, result->urlpath);
+	url = aur_build_url(task->aur, result[0]->aur_urlpath);
 
 	task_reset_for_download(task, url, &response);
 	if (task_http_execute(task, url, package) != 0) {
@@ -827,81 +694,90 @@ void *download(struct task_t *task, const char *package)
 		goto finish;
 	}
 
-	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result->name);
+	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result[0]->name);
 	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
-			colstr.pkg, result->name, colstr.nc, cfg.dlpath);
+			colstr.pkg, result[0]->name, colstr.nc, cfg.dlpath);
 
 	if(cfg.getdeps) {
-		resolve_pkg_dependencies(task, result);
+		resolve_pkg_dependencies(task, result[0]);
 	}
 
 finish:
 	free(response.data);
 
-	return queryresult;
+	return result;
 }
 
-alpm_list_t *dedupe_results(alpm_list_t *list)
-{
-	alpm_list_t *i, *uniqued = NULL;
+/* TODO: rewrite comparators to avoid this duplication */
+static int aurpkgp_cmpname(const void *a, const void *b) {
+	const aurpkg_t *const *p1 = a;
+	const aurpkg_t *const *p2 = b;
+
+	return aurpkg_cmpname(*p1, *p2);
+}
+
+aurpkg_t **dedupe_results(aurpkg_t **packages) {
 	aurpkg_t *prev = NULL;
+	int i, len;
 
-	list = alpm_list_msort(list, alpm_list_count(list), (alpm_list_fn_cmp)aurpkg_cmpname);
+	if (packages == NULL) {
+		return NULL;
+	}
 
-	for(i = list; i; i = i->next) {
-		aurpkg_t *pkg = i->data;
+	len = aur_packages_count(packages);
 
-		if(!prev || aurpkg_cmpname(pkg, prev) != 0) {
-			uniqued = alpm_list_add(uniqued, pkg);
-			prev = pkg;
+	qsort(packages, len, sizeof(*packages), aurpkgp_cmpname);
+
+	for (i = 0; i < len; i++) {
+		if (prev == NULL || aurpkg_cmpname(packages[i], prev) != 0) {
+			prev = packages[i];
 		} else {
-			aurpkg_free(pkg);
+			packages[i]->ignored = 1;
 		}
 	}
 
-	alpm_list_free(list);
-
-	return uniqued;
+	return packages;
 }
 
-alpm_list_t *filter_results(alpm_list_t *list)
-{
-	list = dedupe_results(list);
+int should_ignore_package(const aurpkg_t *package, regex_t *pattern) {
+	if (regexec(pattern, package->name, 0, 0, 0) != REG_NOMATCH) {
+		return 0;
+	}
+
+	if (package->description &&
+			regexec(pattern, package->description, 0, 0, 0) != REG_NOMATCH) {
+		return 0;
+	}
+
+	return 1;
+}
+
+void filter_results(aurpkg_t **packages) {
+	if (packages == NULL) {
+		return;
+	}
+
+	dedupe_results(packages);
 
 	if (cfg.opmask & OP_SEARCH) {
-		alpm_list_t *filtered = NULL;
 		const alpm_list_t *i;
 
-		for(i = cfg.targets; i; i = i->next) {
+		for (i = cfg.targets; i; i = i->next) {
 			regex_t regex;
-			const char *targ = i->data;
-			filtered = NULL;
 
-			if(regcomp(&regex, targ, kRegexOpts) == 0) {
-				alpm_list_t *j;
+			if (regcomp(&regex, i->data, kRegexOpts) == 0) {
+				aurpkg_t **p;
 
-				for(j = list; j; j = j->next) {
-					aurpkg_t *pkg = j->data;
-					const char *name = pkg->name;
-					const char *desc = pkg->desc;
+				for (p = packages; *p; p++) {
+					aurpkg_t *pkg = *p;
 
-					if(regexec(&regex, name, 0, 0, 0) != REG_NOMATCH ||
-							(desc && regexec(&regex, desc, 0, 0, 0) != REG_NOMATCH)) {
-						filtered = alpm_list_add(filtered, pkg);
-					} else {
-						aurpkg_free(pkg);
+					if (pkg->ignored || (pkg->ignored = should_ignore_package(pkg, &regex))) {
+						continue;
 					}
 				}
-				regfree(&regex);
 			}
-
-			/* switcheroo */
-			alpm_list_free(list);
-			list = filtered;
 		}
 	}
-
-	return alpm_list_msort(list, alpm_list_count(list), aurpkg_cmp);
 }
 
 int getcols(void)
@@ -1052,149 +928,6 @@ void indentprint(const char *str, int indent)
 		p++;
 	}
 	free(wcstr);
-}
-
-int json_end_map(void *ctx)
-{
-	json_parser_t *p = ctx;
-
-	p->depth--;
-	if(p->depth > 0) {
-		if(!(p->aurpkg.ood && cfg.ignoreood)) {
-			p->pkglist = alpm_list_add(p->pkglist, aurpkg_dup(&p->aurpkg));
-		} else {
-			aurpkg_free_inner(&p->aurpkg);
-		}
-	}
-
-	return 1;
-}
-
-void *json_get_valueptr(json_parser_t *parser)
-{
-	uint8_t *addr = 0;
-
-	if(parser->key == NULL) {
-		return NULL;
-	}
-
-	switch(parser->key->type) {
-	case JSON_KEY_METADATA:
-		addr = (uint8_t*)parser;
-		break;
-	case JSON_KEY_PACKAGE_ATTR:
-		addr = (uint8_t*)&parser->aurpkg;
-		break;
-	}
-
-	return addr + parser->key->offset;
-}
-
-int json_integer(void *ctx, long long val)
-{
-	json_parser_t *p = ctx;
-	int *valueptr;
-
-	valueptr = json_get_valueptr(p);
-	if(valueptr == NULL) {
-		return 1;
-	}
-
-	*valueptr = val;
-
-	return 1;
-}
-
-int json_double(void *ctx, double val)
-{
-	json_parser_t *p = ctx;
-	double *valueptr;
-
-	valueptr = json_get_valueptr(p);
-	if(valueptr == NULL) {
-		return 1;
-	}
-
-	*valueptr = val;
-
-	return 1;
-}
-
-int json_map_key(void *ctx, const unsigned char *data, size_t size)
-{
-	json_parser_t *p = ctx;
-
-	p->key = string_to_key(data, size);
-
-	return 1;
-}
-
-int json_start_map(void *ctx)
-{
-	json_parser_t *p = ctx;
-
-	p->depth++;
-	if(p->depth > 1) {
-		memset(&p->aurpkg, 0, sizeof(aurpkg_t));
-	}
-
-	return 1;
-}
-
-int json_string(void *ctx, const unsigned char *data, size_t size)
-{
-	json_parser_t *p = ctx;
-	void *valueptr;
-
-	valueptr = json_get_valueptr(p);
-	if(valueptr == NULL) {
-		return 1;
-	}
-
-	if(p->key->multivalued) {
-		return json_string_multivalued(valueptr, data, size);
-	} else {
-		return json_string_singlevalued(valueptr, data, size);
-	}
-}
-
-int json_string_multivalued(alpm_list_t **dest, const unsigned char *data,
-		size_t size)
-{
-	char *str;
-
-	str = strndup((const char *)data, size);
-	if(str == NULL) {
-		return 0;
-	}
-
-	*dest = alpm_list_add(*dest, str);
-
-	return 1;
-}
-
-int json_string_singlevalued(char **dest, const unsigned char *data,
-		size_t size)
-{
-	char *str;
-
-	str = strndup((const char *)data, size);
-	if(str == NULL) {
-		return 0;
-	}
-
-	free(*dest);
-	*dest = str;
-
-	return 1;
-}
-
-int keycmp(const void *v1, const void *v2)
-{
-	const struct key_t *k1 = v1;
-	const struct key_t *k2 = v2;
-
-	return strcmp(k1->name, k2->name);
 }
 
 alpm_list_t *load_targets_from_files(alpm_list_t *files)
@@ -1731,9 +1464,9 @@ int print_escaped(const char *delim)
 	return(out);
 }
 
-void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *delim, int wrap)
+void print_extinfo_list(char **list, const char *fieldname, const char *delim, int wrap)
 {
-	const alpm_list_t *next, *i;
+	char **i, **next;
 	size_t cols, count = 0;
 
 	if(!list) {
@@ -1746,15 +1479,15 @@ void print_extinfo_list(alpm_list_t *list, const char *fieldname, const char *de
 		count += printf("%-*s: ", kInfoIndent - 2, fieldname);
 	}
 
-	for(i = list; i; i = next) {
-		size_t data_len = strlen(i->data);
-		next = i->next;
+	for(i = list; *i; i = next) {
+		size_t data_len = strlen(*i);
+		next = i + 1;
 		if(wrap && cols > 0 && count + data_len >= cols) {
 			printf("%-*c", kInfoIndent + 1, '\n');
 			count = kInfoIndent;
 		}
 		count += data_len;
-		fputs(i->data, stdout);
+		fputs(*i, stdout);
 		if(next) {
 			count += print_escaped(delim);
 		}
@@ -1770,6 +1503,10 @@ void print_pkg_formatted(aurpkg_t *pkg)
 	char fmt[32], buf[64];
 	int len;
 
+	if (pkg->ignored) {
+		return;
+	}
+
 	for(p = cfg.format; *p; p++) {
 		len = 0;
 		if(*p == '%') {
@@ -1781,21 +1518,21 @@ void print_pkg_formatted(aurpkg_t *pkg)
 			switch(*p) {
 				/* simple attributes */
 				case 'a':
-					snprintf(buf, 64, "%ld", pkg->lastmod);
+					snprintf(buf, 64, "%ld", pkg->modified_s);
 					printf(fmt, buf);
 					break;
 				case 'b':
 					printf(fmt, pkg->pkgbase);
 					break;
 				case 'd':
-					printf(fmt, pkg->desc ? pkg->desc : "");
+					printf(fmt, pkg->description ? pkg->description : "");
 					break;
 				case 'i':
-					snprintf(buf, 64, "%d", pkg->id);
+					snprintf(buf, 64, "%d", pkg->package_id);
 					printf(fmt, buf);
 					break;
 				case 'm':
-					printf(fmt, pkg->maint ? pkg->maint : "(orphan)");
+					printf(fmt, pkg->maintainer ? pkg->maintainer : "(orphan)");
 					break;
 				case 'n':
 					printf(fmt, pkg->name);
@@ -1813,21 +1550,24 @@ void print_pkg_formatted(aurpkg_t *pkg)
 					printf(fmt, buf);
 					break;
 				case 's':
-					snprintf(buf, 64, "%ld", pkg->firstsub);
+					snprintf(buf, 64, "%ld", pkg->submitted_s);
 					printf(fmt, buf);
 					break;
 				case 't':
-					printf(fmt, pkg->ood ? "yes" : "no");
+					printf(fmt, pkg->out_of_date ? "yes" : "no");
 					break;
 				case 'u':
-					printf(fmt, pkg->url);
+					printf(fmt, pkg->upstream_url);
 					break;
 				case 'v':
-					printf(fmt, pkg->ver);
+					printf(fmt, pkg->version);
 					break;
 				/* list based attributes */
 				case 'C':
 					print_extinfo_list(pkg->conflicts, NULL, cfg.delim, 0);
+					break;
+				case 'K':
+					print_extinfo_list(pkg->checkdepends, NULL, cfg.delim, 0);
 					break;
 				case 'D':
 					print_extinfo_list(pkg->depends, NULL, cfg.delim, 0);
@@ -1874,16 +1614,20 @@ void print_pkg_info(aurpkg_t *pkg)
 	struct tm *ts;
 	alpm_pkg_t *ipkg;
 
+	if (pkg->ignored) {
+		return;
+	}
+
 	printf("Repository     : %saur%s\n", colstr.repo, colstr.nc);
 	printf("Name           : %s%s%s", colstr.pkg, pkg->name, colstr.nc);
 	if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 		const char *instcolor;
-		if(alpm_pkg_vercmp(pkg->ver, alpm_pkg_get_version(ipkg)) > 0) {
+		if(alpm_pkg_vercmp(pkg->version, alpm_pkg_get_version(ipkg)) > 0) {
 			instcolor = colstr.ood;
 		} else {
 			instcolor = colstr.utd;
 		}
-		if(streq(pkg->ver, alpm_pkg_get_version(ipkg))) {
+		if(streq(pkg->version, alpm_pkg_get_version(ipkg))) {
 			printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
 		} else {
 			printf(" %s[%sinstalled: %s%s]%s", colstr.url, instcolor, alpm_pkg_get_version(ipkg), colstr.url, colstr.nc);
@@ -1895,8 +1639,8 @@ void print_pkg_info(aurpkg_t *pkg)
 	}
 
 	printf("Version        : %s%s%s\n",
-			pkg->ood ? colstr.ood : colstr.utd, pkg->ver, colstr.nc);
-	printf("URL            : %s%s%s\n", colstr.url, pkg->url, colstr.nc);
+			pkg->out_of_date ? colstr.ood : colstr.utd, pkg->version, colstr.nc);
+	printf("URL            : %s%s%s\n", colstr.url, pkg->upstream_url, colstr.nc);
 	printf("AUR Page       : %shttps://%s/packages/%s%s\n",
 			colstr.url, arg_aur_domain, pkg->name, colstr.nc);
 
@@ -1907,10 +1651,10 @@ void print_pkg_info(aurpkg_t *pkg)
 	print_extinfo_list(pkg->conflicts, "Conflicts With", kListDelim, 1);
 
 	if(pkg->optdepends) {
-		const alpm_list_t *i;
-		printf("Optional Deps  : %s\n", (const char*)pkg->optdepends->data);
-		for(i = pkg->optdepends->next; i; i = i->next) {
-			printf("%-*s%s\n", kInfoIndent, "", (const char*)i->data);
+		char **i = pkg->optdepends;
+		printf("Optional Deps  : %s\n", *i);
+		while (*++i) {
+			printf("%-*s%s\n", kInfoIndent, "", *i);
 		}
 	}
 
@@ -1923,67 +1667,74 @@ void print_pkg_info(aurpkg_t *pkg)
 				 "Out of Date    : %s%s%s\n",
 				 pkg->votes,
 				 pkg->popularity,
-				 pkg->ood ? colstr.ood : colstr.utd,
-				 pkg->ood ? "Yes" : "No", colstr.nc);
+				 pkg->out_of_date ? colstr.ood : colstr.utd,
+				 pkg->out_of_date ? "Yes" : "No", colstr.nc);
 
-	printf("Maintainer     : %s\n", pkg->maint ? pkg->maint : "(orphan)");
+	printf("Maintainer     : %s\n", pkg->maintainer ? pkg->maintainer : "(orphan)");
 
-	ts = localtime(&pkg->firstsub);
+	ts = localtime(&pkg->submitted_s);
 	strftime(datestring, 42, "%c", ts);
 	printf("Submitted      : %s\n", datestring);
 
-	ts = localtime(&pkg->lastmod);
+	ts = localtime(&pkg->modified_s);
 	strftime(datestring, 42, "%c", ts);
 	printf("Last Modified  : %s\n", datestring);
 
 	printf("Description    : ");
-	indentprint(pkg->desc, kInfoIndent);
+	indentprint(pkg->description, kInfoIndent);
 	printf("\n\n");
 }
 
 void print_pkg_search(aurpkg_t *pkg)
 {
+	if (pkg->ignored) {
+		return;
+	}
+
 	if(cfg.quiet) {
 		printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
 	} else {
 		alpm_pkg_t *ipkg;
 		printf("%saur/%s%s%s %s%s%s%s (%d, %.2f)", colstr.repo, colstr.nc, colstr.pkg,
-				pkg->name, pkg->ood ? colstr.ood : colstr.utd, pkg->ver,
-				NCFLAG(pkg->ood, " <!>"), colstr.nc, pkg->votes, pkg->popularity);
+				pkg->name, pkg->out_of_date ? colstr.ood : colstr.utd, pkg->version,
+				NCFLAG(pkg->out_of_date, " <!>"), colstr.nc, pkg->votes, pkg->popularity);
 		if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 			const char *instcolor;
-			if(alpm_pkg_vercmp(pkg->ver, alpm_pkg_get_version(ipkg)) > 0) {
+			if(alpm_pkg_vercmp(pkg->version, alpm_pkg_get_version(ipkg)) > 0) {
 				instcolor = colstr.ood;
 			} else {
 				instcolor = colstr.utd;
 			}
-			if(streq(pkg->ver, alpm_pkg_get_version(ipkg))) {
+			if(streq(pkg->version, alpm_pkg_get_version(ipkg))) {
 				printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
 			} else {
 				printf(" %s[%sinstalled: %s%s]%s", colstr.url, instcolor, alpm_pkg_get_version(ipkg), colstr.url, colstr.nc);
 			}
 		}
 		printf("\n    ");
-		indentprint(pkg->desc, kSearchIndent);
+		indentprint(pkg->description, kSearchIndent);
 		fputc('\n', stdout);
 	}
 }
 
-void print_results(alpm_list_t *results, void (*printfn)(aurpkg_t*))
+void print_results(aurpkg_t **packages, void (*printfn)(aurpkg_t*))
 {
-	const alpm_list_t *i;
+	aurpkg_t **r;
 
 	if(!printfn) {
 		return;
 	}
 
-	if(!results && (cfg.opmask & OP_INFO)) {
-		cwr_fprintf(stderr, LOG_ERROR, "no results found\n");
+	if (packages == NULL) {
+		if (cfg.opmask & OP_INFO) {
+			cwr_fprintf(stderr, LOG_ERROR, "no results found\n");
+		}
 		return;
 	}
 
-	for(i = results; i; i = i->next) {
-		printfn(i->data);
+	qsort(packages, aur_packages_count(packages), sizeof(*packages), aurpkg_cmp);
+	for (r = packages; *r; r++) {
+		printfn(*r);
 	}
 }
 
@@ -2010,11 +1761,7 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 			cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
 		} else {
 			if(!pkg_is_binary(depend)) {
-				alpm_list_t *retval;
-
-				retval = task_download(task, sanitized);
-				alpm_list_free_inner(retval, aurpkg_free);
-				alpm_list_free(retval);
+				aur_packages_free(task_download(task, sanitized));
 			}
 		}
 	}
@@ -2023,14 +1770,14 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 }
 
 void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
-	alpm_list_t *i;
+	char **i;
 
-	for(i = package->depends; i; i = i->next) {
-		resolve_one_dep(task, i->data);
+	for (i = package->depends; *i; ++i) {
+		resolve_one_dep(task, *i);
 	}
 
-	for(i = package->makedepends; i; i = i->next) {
-		resolve_one_dep(task, i->data);
+	for (i = package->makedepends; *i; ++i) {
+		resolve_one_dep(task, *i);
 	}
 }
 
@@ -2094,18 +1841,6 @@ int strings_init(void)
 	return 0;
 }
 
-const struct key_t *string_to_key(const unsigned char *key, size_t len)
-{
-	char keybuf[32];
-	struct key_t k;
-
-	snprintf(keybuf, len + 1, "%s", key);
-
-	k.name = keybuf;
-	return bsearch(&k, json_keys, sizeof(json_keys) / sizeof(json_keys[0]),
-			sizeof(json_keys[0]), keycmp);
-}
-
 size_t strtrim(char *str)
 {
 	char *left = str, *right;
@@ -2134,7 +1869,7 @@ size_t strtrim(char *str)
 	return right - left;
 }
 
-void *task_download(struct task_t *task, void *arg)
+aurpkg_t **task_download(struct task_t *task, void *arg)
 {
 	if(pkg_is_binary(arg)) {
 		return NULL;
@@ -2143,40 +1878,39 @@ void *task_download(struct task_t *task, void *arg)
 	}
 }
 
-alpm_list_t *rpc_do(struct task_t *task, const char *method, const char *arg) {
-	json_parser_t json_parser;
-	struct yajl_handle_t *yajl;
+aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
+	struct response_t response = { NULL, 0, 0 };
 	_cleanup_free_ char *escaped = NULL, *url = NULL;
-
-	memset(&json_parser, 0, sizeof(json_parser_t));
-	yajl = yajl_alloc(&callbacks, NULL, &json_parser);
+	aurpkg_t **packages = NULL;
+	int r, packagecount;
 
 	escaped = curl_easy_escape(NULL, arg, 0);
 	url = aur_build_rpc_url(task->aur, method, escaped);
 
-	task_reset_for_rpc(task, url, yajl);
+	task_reset_for_rpc(task, url, &response);
 	if (task_http_execute(task, url, arg) != 0) {
-		goto finish;
+		return NULL;
 	}
 
-	yajl_complete_parse(yajl);
-	if (json_parser.error) {
-		cwr_fprintf(stderr, LOG_ERROR, "[%s]: query failed: %s\n", arg,
-				json_parser.error);
-		goto finish;
+	r = aur_packages_from_json(response.data, &packages, &packagecount);
+	if (r < 0) {
+		cwr_fprintf(stderr, LOG_ERROR, "[%s]: json parsing failed: %s\n", arg, strerror(-r));
+		return NULL;
 	}
 
-finish:
-	yajl_free(yajl);
+	cwr_printf(LOG_DEBUG, "rpc %s request for %s returned %d results\n",
+			method, arg, packagecount);
 
-	return json_parser.pkglist;
+	free(response.data);
+
+	return packages;
 }
 
-alpm_list_t *rpc_info(struct task_t *task, const char *arg) {
+aurpkg_t **rpc_info(struct task_t *task, const char *arg) {
 	return rpc_do(task, "info", arg);
 }
 
-alpm_list_t *rpc_search(struct task_t *task, const char *arg) {
+aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
 	int span = 0;
 	const char *argstr;
 	_cleanup_free_ char *fragment = NULL;
@@ -2217,7 +1951,7 @@ alpm_list_t *rpc_search(struct task_t *task, const char *arg) {
 	return rpc_do(task, "search", fragment);
 }
 
-void *task_query(struct task_t *task, void *arg) {
+aurpkg_t **task_query(struct task_t *task, void *arg) {
 	if (cfg.opmask & OP_SEARCH) {
 		return rpc_search(task, arg);
 	} else if (cfg.opmask & OP_MSEARCH) {
@@ -2227,68 +1961,60 @@ void *task_query(struct task_t *task, void *arg) {
 	}
 }
 
-void *task_update(struct task_t *task, void *arg)
-{
-	aurpkg_t *aurpkg;
-	alpm_list_t *dlretval, *qretval;
+aurpkg_t **task_update(struct task_t *task, void *arg) {
+	aurpkg_t **packages;
+	alpm_pkg_t *pmpkg;
 	const char *candidate = arg;
 
 	cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
 			colstr.pkg, candidate, colstr.nc);
 
-	qretval = rpc_info(task, arg);
-	aurpkg = qretval ? qretval->data : NULL;
-	if(aurpkg) {
-		alpm_pkg_t *pmpkg;
+	packages = rpc_info(task, arg);
+	if (packages == NULL) {
+		return NULL;
+	}
 
-		pmpkg = alpm_db_get_pkg(db_local, arg);
-		if(!pmpkg) {
-			cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n",
-					candidate);
+	pmpkg = alpm_db_get_pkg(db_local, arg);
+	if(!pmpkg) {
+		cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n",
+				candidate);
+		goto finish;
+	}
+
+	if(alpm_pkg_vercmp(packages[0]->version, alpm_pkg_get_version(pmpkg)) > 0) {
+		if(alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
+			if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
+				cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
+						colstr.pkg, candidate, colstr.nc,
+						colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
+						colstr.utd, packages[0]->version, colstr.nc);
+			}
 			goto finish;
 		}
 
-		if(alpm_pkg_vercmp(aurpkg->ver, alpm_pkg_get_version(pmpkg)) > 0) {
-			if(alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
-				if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
-					cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
-							colstr.pkg, candidate, colstr.nc,
-							colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
-							colstr.utd, aurpkg->ver, colstr.nc);
-				}
-				return NULL;
-			}
-
-			if(cfg.opmask & OP_DOWNLOAD) {
-				/* we don't care about the return, but we do care about leaks */
-				dlretval = task_download(task, (void*)aurpkg->name);
-				alpm_list_free_inner(dlretval, aurpkg_free);
-				alpm_list_free(dlretval);
+		if(cfg.opmask & OP_DOWNLOAD) {
+			aur_packages_free(task_download(task, packages[0]->name));
+		} else {
+			if(cfg.quiet) {
+				printf("%s%s%s\n", colstr.pkg, candidate, colstr.nc);
 			} else {
-				if(cfg.quiet) {
-					printf("%s%s%s\n", colstr.pkg, candidate, colstr.nc);
-				} else {
-					cwr_printf(LOG_INFO, "%s%s %s%s%s -> %s%s%s\n",
-							colstr.pkg, candidate,
-							colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
-							colstr.utd, aurpkg->ver, colstr.nc);
-				}
+				cwr_printf(LOG_INFO, "%s%s %s%s%s -> %s%s%s\n",
+						colstr.pkg, candidate,
+						colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
+						colstr.utd, packages[0]->version, colstr.nc);
 			}
-
-			return qretval;
 		}
+
+		return packages;
 	}
 
 finish:
-	alpm_list_free_inner(qretval, aurpkg_free);
-	alpm_list_free(qretval);
+	aur_packages_free(packages);
 	return NULL;
 }
 
-void *thread_pool(void *arg)
-{
-	alpm_list_t *ret = NULL;
-	char *job;
+void *thread_pool(void *arg) {
+	aurpkg_t **packages = NULL;
 	struct task_t task = *(struct task_t *)arg;
 
 	task.curl = curl_easy_init();
@@ -2298,9 +2024,9 @@ void *thread_pool(void *arg)
 	}
 
 	while(1) {
-		job = NULL;
+		char *job = NULL;
+		aurpkg_t **ret;
 
-		/* try to pop off the work queue */
 		pthread_mutex_lock(&listlock);
 		if(workq) {
 			job = workq->data;
@@ -2308,17 +2034,25 @@ void *thread_pool(void *arg)
 		}
 		pthread_mutex_unlock(&listlock);
 
-		/* make sure we hooked a new job */
 		if(!job) {
 			break;
 		}
 
-		ret = alpm_list_join(ret, task.threadfn(&task, job));
+		ret = task.threadfn(&task, job);
+		if (ret != NULL) {
+			int r;
+
+			r = aur_packages_append(&packages, ret);
+			if (r < 0) {
+				cwr_fprintf(stderr, LOG_ERROR, "failed to append task return to package list: %s\n",
+						strerror(-r));
+			}
+		}
 	}
 
 	curl_easy_cleanup(task.curl);
 
-	return ret;
+	return packages;
 }
 
 void usage(void)
@@ -2372,15 +2106,6 @@ void version(void)
 	      "             Cower....\n\n", stdout);
 }
 
-size_t json_parse_stream(void *ptr, size_t size, size_t nmemb, void *userdata)
-{
-	const size_t realsize = size * nmemb;
-
-	yajl_parse(userdata, ptr, realsize);
-
-	return realsize;
-}
-
 int read_targets_from_file(FILE *in, alpm_list_t **targets) {
 	char line[BUFSIZ];
 	int i = 0, c = 0, end = 0;
@@ -2415,7 +2140,7 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) {
 }
 
 int main(int argc, char *argv[]) {
-	alpm_list_t *results = NULL, *thread_return = NULL;
+	aurpkg_t **results = NULL;
 	int ret, n, num_threads;
 	_cleanup_free_ pthread_t *threads = NULL;
 	void (*printfn)(aurpkg_t*) = NULL;
@@ -2525,7 +2250,7 @@ int main(int argc, char *argv[]) {
 	 * thread creation. */
 	alpm_db_get_pkgcache(db_local);
 
-	for(n = 0; n < num_threads; n++) {
+	for (n = 0; n < num_threads; n++) {
 		ret = pthread_create(&threads[n], NULL, thread_pool, &task);
 		if(ret != 0) {
 			cwr_fprintf(stderr, LOG_ERROR, "failed to spawn new thread: %s\n",
@@ -2534,20 +2259,31 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	for(n = 0; n < num_threads; n++) {
+	for (n = 0; n < num_threads; n++) {
+		aurpkg_t **thread_return;
 		pthread_join(threads[n], (void**)&thread_return);
-		results = alpm_list_join(results, thread_return);
+
+		if (thread_return != NULL) {
+			int r;
+
+			r = aur_packages_append(&results, thread_return);
+			if (r < 0) {
+				cwr_fprintf(stderr, LOG_ERROR,
+						"failed to append thread result to package list: %s\n", strerror(-r));
+			}
+		}
 	}
+
+	filter_results(results);
 
 	/* we need to exit with a non-zero value when:
 	 * a) search/info/download returns nothing
 	 * b) update (without download) returns something
 	 * this is opposing behavior, so just XOR the result on a pure update */
-	results = filter_results(results);
-	ret = ((results == NULL) ^ !(cfg.opmask & ~OP_UPDATE));
+	ret = (!have_results(results) ^ !(cfg.opmask & ~OP_UPDATE));
+
 	print_results(results, printfn);
-	alpm_list_free_inner(results, aurpkg_free);
-	alpm_list_free(results);
+	aur_packages_free(results);
 
 	openssl_crypto_cleanup();
 
