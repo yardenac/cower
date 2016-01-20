@@ -204,6 +204,8 @@ B<--listdelim> option.
 
   %D    depends
 
+  %K    checkdepends
+
   %M    makedepends
 
   %O    optdepends
