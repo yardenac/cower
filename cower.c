@@ -145,7 +145,7 @@ struct strings_t {
 	const char *nc;
 };
 
-struct response_t {
+struct buffer_t {
 	char *data;
 	size_t size;
 	size_t capacity;
@@ -164,7 +164,7 @@ static alpm_list_t *alpm_find_foreign_pkgs(void);
 static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
-static int archive_extract_file(const struct response_t*);
+static int archive_extract_file(const struct buffer_t*);
 static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
@@ -411,7 +411,7 @@ const char *alpm_provides_pkg(const char *pkgname)
 	return dbname;
 }
 
-int archive_extract_file(const struct response_t *file)
+int archive_extract_file(const struct buffer_t *file)
 {
 	struct archive *archive;
 	struct archive_entry *entry;
@@ -607,7 +607,7 @@ void task_reset_for_download(struct task_t *task, const char *url, void *writeda
 
 size_t curl_buffer_response(void *ptr, size_t size, size_t nmemb, void *userdata) {
 	const size_t realsize = size * nmemb;
-	struct response_t *mem = userdata;
+	struct buffer_t *mem = userdata;
 
 	if (mem->data == NULL || mem->capacity - realsize <= mem->size) {
 		char *newdata;
@@ -662,7 +662,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
 	aurpkg_t **result;
 	_cleanup_free_ char *url = NULL;
 	int ret;
-	struct response_t response = { NULL, 0, 0 };
+	struct buffer_t response = { NULL, 0, 0 };
 
 	result = rpc_info(task, package);
 	if(!result) {
@@ -1911,7 +1911,7 @@ aurpkg_t **task_download(struct task_t *task, void *arg)
 }
 
 aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
-	struct response_t response = { NULL, 0, 0 };
+	struct buffer_t response = { NULL, 0, 0 };
 	_cleanup_free_ char *escaped = NULL, *url = NULL;
 	aurpkg_t **packages = NULL;
 	int r, packagecount;
