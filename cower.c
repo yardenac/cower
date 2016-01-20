@@ -764,18 +764,19 @@ void filter_results(aurpkg_t **packages) {
 
 		for (i = cfg.targets; i; i = i->next) {
 			regex_t regex;
+			aurpkg_t **p;
 
-			if (regcomp(&regex, i->data, kRegexOpts) == 0) {
-				aurpkg_t **p;
+			/* this should succeed since we validated the regex up front */
+			regcomp(&regex, i->data, kRegexOpts);
 
-				for (p = packages; *p; p++) {
-					aurpkg_t *pkg = *p;
+			for (p = packages; *p; p++) {
+				aurpkg_t *pkg = *p;
 
-					if (pkg->ignored || (pkg->ignored = should_ignore_package(pkg, &regex))) {
-						continue;
-					}
+				if (pkg->ignored || (pkg->ignored = should_ignore_package(pkg, &regex))) {
+					continue;
 				}
 			}
+			regfree(&regex);
 		}
 	}
 }
@@ -1322,6 +1323,25 @@ int parse_options(int argc, char *argv[])
 			NOT_EXCL(OP_UPDATE|OP_DOWNLOAD)) {
 		fprintf(stderr, "error: invalid operation\n");
 		return 1;
+	}
+
+	if (cfg.opmask & OP_SEARCH) {
+		int i;
+
+		for (i = optind; i < argc; i++) {
+			regex_t regex;
+			int r;
+
+			r = regcomp(&regex, argv[i], kRegexOpts);
+			if (r != 0) {
+				char error_buffer[100];
+
+				regerror(r, &regex, error_buffer, sizeof(error_buffer));
+				fprintf(stderr, "error: invalid regex: %s: %s\n", argv[i], error_buffer);
+
+				return 1;
+			}
+		}
 	}
 
 	while(optind < argc) {
@@ -1955,10 +1975,13 @@ aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
 		return NULL;
 	}
 
+
 	fragment = strndup(argstr, span);
 	if (fragment == NULL) {
 		return NULL;
 	}
+
+	cwr_printf(LOG_DEBUG, "searching with fragment '%s' from '%s'\n", fragment, arg);
 
 	return rpc_do(task, "search", fragment);
 }
