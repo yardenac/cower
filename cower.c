@@ -1397,6 +1397,7 @@ void pkgbuild_get_depends(char *pkgbuild, alpm_list_t **deplist)
 		}
 
 		if(!startswith(lineptr, "depends=(") &&
+			!startswith(lineptr, "checkdepends=(") &&
 			!startswith(lineptr, "makedepends=(")) {
 			continue;
 		}
@@ -1770,14 +1771,25 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 }
 
 void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
-	char **i;
+	struct deparray_t {
+		char ***array;
+		const char *name;
+	} deparrays[] = {
+		{ &package->depends, "depends" },
+		{ &package->makedepends, "makedepends" },
+		{ &package->checkdepends, "checkdepends" },
+		{ NULL, NULL },
+	};
+	struct deparray_t *d;
 
-	for (i = package->depends; *i; ++i) {
-		resolve_one_dep(task, *i);
-	}
-
-	for (i = package->makedepends; *i; ++i) {
-		resolve_one_dep(task, *i);
+	for (d = deparrays; d->array; d++) {
+		cwr_printf(LOG_DEBUG, "resolving %s for %s\n", d->name, package->name);
+		if (*d->array) {
+			char **p;
+			for (p = *d->array; *p; p++) {
+				resolve_one_dep(task, *p);
+			}
+		}
 	}
 }
 
