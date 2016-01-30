@@ -61,6 +61,9 @@
 #define _cleanup_free_ _cleanup_(freep)
 static inline void freep(void *p) { free(*(void**) p); }
 
+#define _cleanup_fclose_ _cleanup_(fclosep)
+static inline void fclosep(FILE **f) { if (*f) fclose(*f); }
+
 #ifndef PACMAN_ROOT
 	#define PACMAN_ROOT         "/"
 #endif
@@ -301,7 +304,7 @@ int startswith(const char *s1, const char *s2)
 /* TODO: handle includes. maybe use pkgfile's parser as a starting point. */
 alpm_handle_t *alpm_init(void)
 {
-	FILE *fp;
+	_cleanup_fclose_ FILE *fp = NULL;
 	char line[PATH_MAX];
 	char *ptr, *section = NULL;
 	alpm_errno_t err;
@@ -357,7 +360,6 @@ alpm_handle_t *alpm_init(void)
 	db_local = alpm_get_localdb(pmhandle);
 
 	free(section);
-	fclose(fp);
 
 	return pmhandle;
 }
@@ -809,7 +811,7 @@ int getcols(void)
 
 char *get_file_as_buffer(const char *path)
 {
-	FILE *fp;
+	_cleanup_fclose_ FILE *fp = NULL;
 	char *buf;
 	long fsize, nread;
 
@@ -827,7 +829,6 @@ char *get_file_as_buffer(const char *path)
 	buf = calloc(1, (size_t)fsize + 1);
 
 	nread = fread(buf, 1, fsize, fp);
-	fclose(fp);
 
 	if(nread < fsize) {
 		cwr_fprintf(stderr, LOG_ERROR, "Failed to read full PKGBUILD\n");
@@ -1040,7 +1041,7 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array)
 int parse_configfile(void)
 {
 	char line[BUFSIZ], config_path[PATH_MAX];
-	int ret = 0;
+	int r = 0;
 	FILE *fp;
 
 	if(get_config_path(config_path, sizeof(config_path)) != 0) {
@@ -1102,11 +1103,11 @@ int parse_configfile(void)
 					/* error on relative paths */
 					if(*cfg.dlpath != '/') {
 						fprintf(stderr, "error: TargetDir cannot be a relative path\n");
-						ret = 1;
+						r = 1;
 					}
 				} else {
 					fprintf(stderr, "error: failed to resolve option to TargetDir\n");
-					ret = 1;
+					r = 1;
 				}
 			}
 		} else if(streq(key, "MaxThreads")) {
@@ -1114,7 +1115,7 @@ int parse_configfile(void)
 				cfg.maxthreads = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.maxthreads <= 0) {
 					fprintf(stderr, "error: invalid option to MaxThreads: %s\n", val);
-					ret = 1;
+					r = 1;
 				}
 			}
 		} else if(streq(key, "ConnectTimeout")) {
@@ -1122,7 +1123,7 @@ int parse_configfile(void)
 				cfg.timeout = strtol(val, &key, 10);
 				if(*key != '\0' || cfg.timeout < 0) {
 					fprintf(stderr, "error: invalid option to ConnectTimeout: %s\n", val);
-					ret = 1;
+					r = 1;
 				}
 			}
 		} else if(streq(key, "Color")) {
@@ -1139,14 +1140,9 @@ int parse_configfile(void)
 		} else {
 			fprintf(stderr, "ignoring unknown option: %s\n", key);
 		}
-		if(ret > 0) {
-			goto finish;
-		}
 	}
 
-finish:
-	fclose(fp);
-	return ret;
+	return r;
 }
 
 int parse_options(int argc, char *argv[])
