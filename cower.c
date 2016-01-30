@@ -164,7 +164,7 @@ static alpm_list_t *alpm_find_foreign_pkgs(void);
 static alpm_handle_t *alpm_init(void);
 static int alpm_pkg_is_foreign(alpm_pkg_t*);
 static const char *alpm_provides_pkg(const char*);
-static int archive_extract_file(const struct buffer_t*);
+static int archive_extract_file(char *, size_t);
 static int aurpkg_cmpver(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpmaint(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
@@ -413,7 +413,7 @@ const char *alpm_provides_pkg(const char *pkgname)
 	return dbname;
 }
 
-int archive_extract_file(const struct buffer_t *file)
+int archive_extract_file(char *data, size_t size)
 {
 	struct archive *archive;
 	struct archive_entry *entry;
@@ -424,7 +424,7 @@ int archive_extract_file(const struct buffer_t *file)
 	archive_read_support_filter_all(archive);
 	archive_read_support_format_all(archive);
 
-	if(archive_read_open_memory(archive, file->data, file->size) != ARCHIVE_OK) {
+	if(archive_read_open_memory(archive, data, size) != ARCHIVE_OK) {
 		return archive_errno(archive);
 	}
 
@@ -688,7 +688,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
 		goto finish;
 	}
 
-	ret = archive_extract_file(&response);
+	ret = archive_extract_file(response.data, response.size);
 	if(ret != 0) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
