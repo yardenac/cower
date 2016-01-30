@@ -200,6 +200,8 @@ static int pkg_is_binary(const char *pkg);
 static void pkgbuild_get_depends(char*, alpm_list_t**);
 static int print_escaped(const char*);
 static void print_extinfo_list(char **, const char*, const char*, int);
+static void print_colored(const char *fieldname, const char *color, const char *value);
+static void print_time(const char *fieldname, time_t* timestamp);
 static void print_pkg_formatted(aurpkg_t*);
 static void print_pkg_info(aurpkg_t*);
 static void print_pkg_search(aurpkg_t*);
@@ -1485,6 +1487,18 @@ int print_escaped(const char *delim)
 	return(out);
 }
 
+void print_colored(const char *fieldname, const char *color, const char *value) {
+	printf("%-*s: %s%s%s\n", kInfoIndent - 2, fieldname, color ? color : "", value, color ? colstr.nc : "");
+}
+
+void print_time(const char *fieldname, time_t *timestamp) {
+	char str[42];
+	struct tm t;
+
+	strftime(str, 42, "%c", localtime_r(timestamp, &t));
+	printf("%-*s: %s\n", kInfoIndent - 2, fieldname, str);
+}
+
 void print_extinfo_list(char **list, const char *fieldname, const char *delim, int wrap)
 {
 	char **i, **next;
@@ -1631,15 +1645,13 @@ void print_pkg_formatted(aurpkg_t *pkg)
 
 void print_pkg_info(aurpkg_t *pkg)
 {
-	char datestring[42];
-	struct tm *ts;
 	alpm_pkg_t *ipkg;
 
 	if (pkg->ignored) {
 		return;
 	}
 
-	printf("Repository     : %saur%s\n", colstr.repo, colstr.nc);
+	print_colored("Repository", colstr.repo, "aur");
 	printf("Name           : %s%s%s", colstr.pkg, pkg->name, colstr.nc);
 	if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
 		const char *instcolor;
@@ -1655,13 +1667,13 @@ void print_pkg_info(aurpkg_t *pkg)
 		}
 	}
 	fputc('\n', stdout);
+
 	if(!streq(pkg->name, pkg->pkgbase)) {
-		printf("PackageBase    : %s%s%s\n", colstr.pkg, pkg->pkgbase, colstr.nc);
+		print_colored("PackageBase", colstr.pkg, pkg->pkgbase);
 	}
 
-	printf("Version        : %s%s%s\n",
-			pkg->out_of_date ? colstr.ood : colstr.utd, pkg->version, colstr.nc);
-	printf("URL            : %s%s%s\n", colstr.url, pkg->upstream_url, colstr.nc);
+	print_colored("Version", pkg->out_of_date ? colstr.ood : colstr.utd, pkg->version);
+	print_colored("URL", colstr.url, pkg->upstream_url);
 	printf("AUR Page       : %shttps://%s/packages/%s%s\n",
 			colstr.url, arg_aur_domain, pkg->name, colstr.nc);
 
@@ -1680,7 +1692,6 @@ void print_pkg_info(aurpkg_t *pkg)
 	}
 
 	print_extinfo_list(pkg->replaces, "Replaces", kListDelim, 1);
-
 	print_extinfo_list(pkg->licenses, "License", kListDelim, 1);
 
 	printf("Votes          : %d\n"
@@ -1691,19 +1702,13 @@ void print_pkg_info(aurpkg_t *pkg)
 				 pkg->out_of_date ? colstr.ood : colstr.utd,
 				 pkg->out_of_date ? "Yes" : "No", colstr.nc);
 
-	printf("Maintainer     : %s\n", pkg->maintainer ? pkg->maintainer : "(orphan)");
-
-	ts = localtime(&pkg->submitted_s);
-	strftime(datestring, 42, "%c", ts);
-	printf("Submitted      : %s\n", datestring);
-
-	ts = localtime(&pkg->modified_s);
-	strftime(datestring, 42, "%c", ts);
-	printf("Last Modified  : %s\n", datestring);
+	print_colored("Maintainer", NULL, pkg->maintainer ? pkg->maintainer : "(orphan)");
+	print_time("Submitted", &pkg->submitted_s);
+	print_time("Last Modified", &pkg->modified_s);
 
 	printf("Description    : ");
 	indentprint(pkg->description, kInfoIndent);
-	printf("\n\n");
+	fputs("\n\n", stdout);
 }
 
 void print_pkg_search(aurpkg_t *pkg)
