@@ -4,34 +4,34 @@
 #include <sys/types.h>
 
 struct aurpkg_t {
-	char *name;
-	char *description;
-	char *maintainer;
-	char *pkgbase;
-	char *upstream_url;
-	char *aur_urlpath;
-	char *version;
+  char *name;
+  char *description;
+  char *maintainer;
+  char *pkgbase;
+  char *upstream_url;
+  char *aur_urlpath;
+  char *version;
 
-	int category_id;
-	int package_id;
-	int pkgbaseid;
-	int out_of_date;
-	int votes;
-	double popularity;
-	time_t submitted_s;
-	time_t modified_s;
+  int category_id;
+  int package_id;
+  int pkgbaseid;
+  int out_of_date;
+  int votes;
+  double popularity;
+  time_t submitted_s;
+  time_t modified_s;
 
-	char **licenses;
-	char **conflicts;
-	char **depends;
-	char **groups;
-	char **makedepends;
-	char **optdepends;
-	char **checkdepends;
-	char **provides;
-	char **replaces;
+  char **licenses;
+  char **conflicts;
+  char **depends;
+  char **groups;
+  char **makedepends;
+  char **optdepends;
+  char **checkdepends;
+  char **provides;
+  char **replaces;
 
-	int ignored;
+  int ignored;
 };
 typedef struct aurpkg_t aurpkg_t;
 

@@ -4,9 +4,9 @@
 #include <curl/curl.h>
 
 struct aur_t {
-	char *urlprefix;
+  char *urlprefix;
 
-	int rpc_version;
+  int rpc_version;
 };
 typedef struct aur_t aur_t;
 
