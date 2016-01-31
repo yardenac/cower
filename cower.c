@@ -136,18 +136,6 @@ enum {
 	SORT_REVERSE = -1
 };
 
-struct strings_t {
-	const char *error;
-	const char *warn;
-	const char *info;
-	const char *pkg;
-	const char *repo;
-	const char *url;
-	const char *ood;
-	const char *utd;
-	const char *nc;
-};
-
 struct buffer_t {
 	char *data;
 	size_t size;
@@ -276,10 +264,20 @@ static const long kTimeoutDefault = 10;
 static const char kListDelim[] = "  ";
 static const char kCowerUserAgent[] = "cower/" COWER_VERSION;
 static const char kRegexChars[] = "^.+*?$[](){}|\\";
-static char const *kDigits = "0123456789";
-static char const *kPrintfFlags = "'-+ #0I";
+static const char kDigits[] = "0123456789";
+static const char kPrintfFlags[] = "'-+ #0I";
 
-static struct strings_t colstr = {
+static struct {
+	const char *error;
+	const char *warn;
+	const char *info;
+	const char *pkg;
+	const char *repo;
+	const char *url;
+	const char *ood;
+	const char *utd;
+	const char *nc;
+} colstr = {
 	.error = "error:",
 	.warn = "warning:",
 	.info = "::",
