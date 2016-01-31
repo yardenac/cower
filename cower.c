@@ -195,6 +195,7 @@ static void print_colored(const char *fieldname, const char *color, const char *
 static void print_time(const char *fieldname, time_t* timestamp);
 static void print_pkg_formatted(aurpkg_t*);
 static void print_pkg_info(aurpkg_t*);
+static void print_pkg_installed_tag(aurpkg_t*);
 static void print_pkg_search(aurpkg_t*);
 static void print_results(aurpkg_t **, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
@@ -1638,29 +1639,36 @@ void print_pkg_formatted(aurpkg_t *pkg)
 	return;
 }
 
+void print_pkg_installed_tag(aurpkg_t *pkg) {
+	alpm_pkg_t *local_pkg;
+	const char *instcolor;
+
+	local_pkg = alpm_db_get_pkg(db_local, pkg->name);
+	if (local_pkg == NULL) {
+		return;
+	}
+
+	instcolor = alpm_pkg_vercmp(pkg->version, alpm_pkg_get_version(local_pkg)) > 0
+		? colstr.ood
+		: colstr.utd;
+
+	if (streq(pkg->version, alpm_pkg_get_version(local_pkg))) {
+		printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
+	} else {
+		printf(" %s[%sinstalled: %s%s]%s", colstr.url, instcolor,
+				alpm_pkg_get_version(local_pkg), colstr.url, colstr.nc);
+	}
+}
+
 void print_pkg_info(aurpkg_t *pkg)
 {
-	alpm_pkg_t *ipkg;
-
 	if (pkg->ignored) {
 		return;
 	}
 
 	print_colored("Repository", colstr.repo, "aur");
 	printf("Name           : %s%s%s", colstr.pkg, pkg->name, colstr.nc);
-	if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
-		const char *instcolor;
-		if(alpm_pkg_vercmp(pkg->version, alpm_pkg_get_version(ipkg)) > 0) {
-			instcolor = colstr.ood;
-		} else {
-			instcolor = colstr.utd;
-		}
-		if(streq(pkg->version, alpm_pkg_get_version(ipkg))) {
-			printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
-		} else {
-			printf(" %s[%sinstalled: %s%s]%s", colstr.url, instcolor, alpm_pkg_get_version(ipkg), colstr.url, colstr.nc);
-		}
-	}
+	print_pkg_installed_tag(pkg);
 	fputc('\n', stdout);
 
 	if(!streq(pkg->name, pkg->pkgbase)) {
@@ -1715,23 +1723,10 @@ void print_pkg_search(aurpkg_t *pkg)
 	if(cfg.quiet) {
 		printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
 	} else {
-		alpm_pkg_t *ipkg;
 		printf("%saur/%s%s%s %s%s%s%s (%d, %.2f)", colstr.repo, colstr.nc, colstr.pkg,
 				pkg->name, pkg->out_of_date ? colstr.ood : colstr.utd, pkg->version,
 				NCFLAG(pkg->out_of_date, " <!>"), colstr.nc, pkg->votes, pkg->popularity);
-		if((ipkg = alpm_db_get_pkg(db_local, pkg->name))) {
-			const char *instcolor;
-			if(alpm_pkg_vercmp(pkg->version, alpm_pkg_get_version(ipkg)) > 0) {
-				instcolor = colstr.ood;
-			} else {
-				instcolor = colstr.utd;
-			}
-			if(streq(pkg->version, alpm_pkg_get_version(ipkg))) {
-				printf(" %s[%sinstalled%s]%s", colstr.url, instcolor, colstr.url, colstr.nc);
-			} else {
-				printf(" %s[%sinstalled: %s%s]%s", colstr.url, instcolor, alpm_pkg_get_version(ipkg), colstr.url, colstr.nc);
-			}
-		}
+		print_pkg_installed_tag(pkg);
 		printf("\n    ");
 		indentprint(pkg->description, kSearchIndent);
 		fputc('\n', stdout);
