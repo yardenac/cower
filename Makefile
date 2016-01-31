@@ -1,14 +1,18 @@
 # cower - a simple AUR downloader
 
 OUT        = cower
-VERSION    = $(shell git describe)
 
-SRC        = cower.c aur.c package.c
-OBJ        = $(SRC:.c=.o)
-DISTFILES  = Makefile README.pod bash_completion zsh_completion config cower.c aur.c aur.h package.c package.h
+VERSION    = 14
+VDEVEL     = $(shell test -d .git && git describe 2>/dev/null)
+
+ifneq "$(VDEVEL)" ""
+VERSION    = $(VDEVEL)
+endif
 
 PREFIX    ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
+
+OBJ        =
 
 CPPFLAGS  := -D_GNU_SOURCE -DCOWER_VERSION=\"$(VERSION)\" $(CPPFLAGS)
 CFLAGS    := -std=c99 -g -pedantic -Wall -Wextra -pthread $(CFLAGS)
@@ -17,12 +21,29 @@ LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto
 
 bash_completiondir = /usr/share/bash-completion/completions
 
+all: $(OUT) doc
+
+aur.o: \
+	aur.c \
+	aur.h
+OBJ += aur.o
+
+package.o: \
+	package.c \
+	package.h
+OBJ += package.o
+
+cower.o: \
+	cower.c
+OBJ += cower.o
+
+cower: \
+	aur.o \
+	package.o \
+	cower.o
+
 MANPAGES = \
 	cower.1
-
-$(OUT): $(OBJ)
-
-all: $(OUT) doc
 
 doc: $(MANPAGES)
 cower.1: README.pod
@@ -46,23 +67,14 @@ uninstall:
 		"$(DESTDIR)$(PREFIX)/share/doc/cower/config"
 
 dist: clean
-	mkdir cower-$(VERSION)
-	cp $(DISTFILES) cower-$(VERSION)
-	sed "s/\(^VERSION *\)= .*/\1= $(VERSION)/" Makefile > cower-$(VERSION)/Makefile
-	tar czf cower-$(VERSION).tar.gz cower-$(VERSION)
-	rm -rf cower-$(VERSION)
-
-distcheck: dist
-	tar xf cower-$(VERSION).tar.gz
-	$(MAKE) -C cower-$(VERSION)
-	rm -rf cower-$(VERSION)
+	git archive --format=tar --prefix=$(OUT)-$(VERSION)/ HEAD | gzip -9 > $(OUT)-$(VERSION).tar.gz
 
 clean:
 	$(RM) $(OUT) $(OBJ) $(MANPAGES)
 
 upload: dist
-	gpg --detach-sign cower-$(VERSION).tar.gz
-	scp cower-$(VERSION).tar.gz cower-$(VERSION).tar.gz.sig code.falconindy.com:archive/cower/
+	gpg --detach-sign $(OUT)-$(VERSION).tar.gz
+	scp $(OUT)-$(VERSION).tar.gz $(OUT)-$(VERSION).tar.gz.sig code.falconindy.com:archive/$(OUT)/
 
 .PHONY: clean dist doc install uninstall
 
