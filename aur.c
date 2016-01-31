@@ -42,8 +42,18 @@ static char *aur_urlf(aur_t *aur, const char *urlpath_format, ...) {
 	return out;
 }
 
-char *aur_build_rpc_url(aur_t *aur, const char *method, const char *escaped_arg) {
-	return aur_urlf(aur, "/rpc.php?v=%d&type=%s&arg=%s", aur->rpc_version, method, escaped_arg);
+char *aur_build_rpc_url(aur_t *aur, const char *method, const char *arg) {
+	char *escaped, *url;
+
+	escaped = curl_easy_escape(NULL, arg, 0);
+	if (escaped == NULL) {
+		return NULL;
+	}
+
+	url = aur_urlf(aur, "/rpc.php?v=%d&type=%s&arg=%s", aur->rpc_version, method, escaped);
+	free(escaped);
+
+	return url;
 }
 
 char *aur_build_url(aur_t *aur, const char *urlpath) {
@@ -87,3 +97,5 @@ void aur_free(aur_t *aur) {
 	free(aur->urlprefix);
 	free(aur);
 }
+
+/* vim: set noet ts=2 sw=2: */

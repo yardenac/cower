@@ -1892,12 +1892,11 @@ aurpkg_t **task_download(struct task_t *task, void *arg)
 
 aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
 	struct buffer_t response = { NULL, 0, 0 };
-	_cleanup_free_ char *escaped = NULL, *url = NULL;
+	_cleanup_free_ char *url = NULL;
 	aurpkg_t **packages = NULL;
 	int r, packagecount;
 
-	escaped = curl_easy_escape(NULL, arg, 0);
-	url = aur_build_rpc_url(task->aur, method, escaped);
+	url = aur_build_rpc_url(task->aur, method, arg);
 
 	task_reset_for_rpc(task, url, &response);
 	if (task_http_execute(task, url, arg) != 0) {
