@@ -232,7 +232,7 @@ static void version(void);
 
 /* runtime configuration */
 static struct {
-	char *dlpath;
+	char *working_dir;
 	const char *delim;
 	const char *format;
 
@@ -678,7 +678,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
 	if(access(package, F_OK) == 0 && !cfg.force) {
 		cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
 		cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
-				cfg.dlpath, package);
+				cfg.working_dir, package);
 		aur_packages_free(result);
 		return NULL;
 	}
@@ -700,7 +700,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
 
 	cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result[0]->name);
 	cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
-			colstr.pkg, result[0]->name, colstr.nc, cfg.dlpath);
+			colstr.pkg, result[0]->name, colstr.nc, cfg.working_dir);
 
 	if(cfg.getdeps) {
 		resolve_pkg_dependencies(task, result[0]);
@@ -941,6 +941,7 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files)
 	for(i = files; i; i = i->next) {
 		char *pkgbuild = get_file_as_buffer(i->data);
 
+		/* TODO: parse .SRCINFO instead of PKGBUILD */
 		pkgbuild_get_depends(pkgbuild, &results);
 		free(pkgbuild);
 	}
@@ -1097,11 +1098,11 @@ int parse_configfile(void)
 				wordexp_t p;
 				if(wordexp(val, &p, 0) == 0) {
 					if(p.we_wordc == 1) {
-						cfg.dlpath = strdup(p.we_wordv[0]);
+						cfg.working_dir = strdup(p.we_wordv[0]);
 					}
 					wordfree(&p);
 					/* error on relative paths */
-					if(*cfg.dlpath != '/') {
+					if(*cfg.working_dir != '/') {
 						fprintf(stderr, "error: TargetDir cannot be a relative path\n");
 						r = 1;
 					}
@@ -1237,7 +1238,7 @@ int parse_options(int argc, char *argv[])
 				cfg.quiet |= 1;
 				break;
 			case 't':
-				cfg.dlpath = strdup(optarg);
+				cfg.working_dir = strdup(optarg);
 				break;
 			case 'v':
 				cfg.logmask |= LOG_VERBOSE;
@@ -1816,39 +1817,24 @@ void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
 
 int ch_working_dir(void)
 {
-	char *resolved;
-
-	if(!(cfg.opmask & OP_DOWNLOAD)) {
-		free(cfg.dlpath);
-		cfg.dlpath = NULL;
+	if (!(cfg.opmask & OP_DOWNLOAD)) {
 		return 0;
 	}
 
-	resolved = cfg.dlpath ? realpath(cfg.dlpath, NULL) : getcwd(NULL, 0);
-	if(!resolved) {
-		fprintf(stderr, "error: failed to resolve download path %s: %s\n",
-				cfg.dlpath, strerror(errno));
-		free(cfg.dlpath);
-		cfg.dlpath = NULL;
-		return 1;
-	}
-
-	free(cfg.dlpath);
-	cfg.dlpath = resolved;
-
-	if(access(cfg.dlpath, W_OK) != 0) {
+	if (access(cfg.working_dir ? cfg.working_dir : ".", W_OK) != 0) {
 		fprintf(stderr, "error: cannot write to %s: %s\n",
-				cfg.dlpath, strerror(errno));
-		free(cfg.dlpath);
-		cfg.dlpath = NULL;
+				cfg.working_dir ? cfg.working_dir : "current directory", strerror(errno));
 		return 1;
 	}
 
-	if(chdir(cfg.dlpath) != 0) {
-		fprintf(stderr, "error: failed to chdir to %s: %s\n", cfg.dlpath,
-				strerror(errno));
-		return 1;
+	if (cfg.working_dir && chdir(cfg.working_dir) != 0) {
+			fprintf(stderr, "error: failed to chdir to %s: %s\n", cfg.working_dir,
+					strerror(errno));
+			return 1;
 	}
+
+	free(cfg.working_dir);
+	cfg.working_dir = getcwd(NULL, 0);
 
 	return 0;
 }
@@ -2324,7 +2310,7 @@ int main(int argc, char *argv[]) {
 	openssl_crypto_cleanup();
 
 finish:
-	free(cfg.dlpath);
+	free(cfg.working_dir);
 	FREELIST(cfg.targets);
 	FREELIST(cfg.ignore.pkgs);
 	FREELIST(cfg.ignore.repos);
