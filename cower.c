@@ -206,7 +206,7 @@ static aurpkg_t **rpc_info(struct task_t *task, const char *arg);
 static aurpkg_t **rpc_search(struct task_t *task, const char *arg);
 static int ch_working_dir(void);
 static int should_ignore_package(const aurpkg_t *package, regex_t *pattern);
-static int strings_init(void);
+static void strings_init(void);
 static size_t strtrim(char*);
 static int task_http_execute(struct task_t *, const char *, const char *);
 static void task_reset(struct task_t *, const char *, void *);
@@ -1350,7 +1350,9 @@ int parse_options(int argc, char *argv[])
     optind++;
   }
 
-  return 0;
+  strings_init();
+
+  return ch_working_dir();
 }
 
 int parse_keyname(char* keyname)
@@ -1832,7 +1834,7 @@ int ch_working_dir(void)
   return 0;
 }
 
-int strings_init(void)
+void strings_init(void)
 {
   if(cfg.color > 0) {
     colstr.error = BOLDRED "::" NC;
@@ -1849,8 +1851,6 @@ int strings_init(void)
   /* guard against delim being something other than kListDelim if extinfo
    * and format aren't provided */
   cfg.delim = cfg.format ? cfg.delim : kListDelim;
-
-  return 0;
 }
 
 size_t strtrim(char *str)
@@ -2188,10 +2188,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if(strings_init() != 0) {
-    return 1;
-  }
-
   if(cfg.frompkgbuild) {
     /* treat arguments as filenames to load/extract */
     cfg.targets = load_targets_from_files(cfg.targets);
@@ -2207,11 +2203,6 @@ int main(int argc, char *argv[]) {
     if(!freopen(ctermid(NULL), "r", stdin)) {
       cwr_printf(LOG_DEBUG, "failed to reopen stdin for reading\n");
     }
-  }
-
-  ret = ch_working_dir();
-  if(ret != 0) {
-    goto finish;
   }
 
   cwr_printf(LOG_DEBUG, "initializing curl\n");
