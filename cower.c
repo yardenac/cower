@@ -165,18 +165,19 @@ static int aurpkg_cmplastmod(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmpname(const aurpkg_t *pkg1, const aurpkg_t *pkg2);
 static int aurpkg_cmp(const void*, const void*);
+static aurpkg_t **cower_perform(struct task_t *task, int num_threads);
 static size_t curl_buffer_response(void*, size_t, size_t, void*);
 static int cwr_fprintf(FILE*, loglevel_t, const char*, ...) __attribute__((format(printf,3,4)));
 static int cwr_printf(loglevel_t, const char*, ...) __attribute__((format(printf,2,3)));
 static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((format(printf,3,0)));
 static aurpkg_t **dedupe_results(aurpkg_t **list);
 static aurpkg_t **download(struct task_t *task, const char*);
-static void filter_results(aurpkg_t **);
+static aurpkg_t **filter_results(aurpkg_t **);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static int get_config_path(char *config_path, size_t pathlen);
 static int globcompare(const void *a, const void *b);
-static int have_results(aurpkg_t **packages);
+static int have_unignored_results(aurpkg_t **packages);
 static void indentprint(const char*, int);
 static alpm_list_t *load_targets_from_files(alpm_list_t *files);
 static void openssl_crypto_cleanup(void);
@@ -219,35 +220,6 @@ static void *thread_pool(void*);
 static void usage(void);
 static void version(void);
 
-/* runtime configuration */
-static struct {
-  char *working_dir;
-  const char *delim;
-  const char *format;
-
-  operation_t opmask;
-  loglevel_t logmask;
-
-  short color;
-  short ignoreood;
-  short sortorder;
-  int force:1;
-  int getdeps:1;
-  int quiet:1;
-  int skiprepos:1;
-  int frompkgbuild:1;
-  int maxthreads;
-  long timeout;
-
-  int (*sort_fn) (const aurpkg_t*, const aurpkg_t*);
-
-  alpm_list_t *targets;
-  struct {
-    alpm_list_t *pkgs;
-    alpm_list_t *repos;
-  } ignore;
-} cfg;
-
 static char *arg_aur_domain = "aur.archlinux.org";
 
 /* globals */
@@ -257,11 +229,9 @@ static alpm_list_t *workq;
 static pthread_mutex_t *openssl_lock;
 static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
 
-static const int kThreadDefault = 10;
 static const int kInfoIndent = 17;
 static const int kSearchIndent = 4;
 static const int kRegexOpts = REG_ICASE|REG_EXTENDED|REG_NOSUB|REG_NEWLINE;
-static const long kTimeoutDefault = 10;
 static const char kListDelim[] = "  ";
 static const char kCowerUserAgent[] = "cower/" COWER_VERSION;
 static const char kRegexChars[] = "^.+*?$[](){}|\\";
@@ -288,6 +258,43 @@ static struct {
   .ood = "",
   .utd = "",
   .nc = ""
+};
+
+
+/* runtime configuration */
+static struct {
+  char *working_dir;
+  const char *delim;
+  const char *format;
+
+  operation_t opmask;
+  loglevel_t logmask;
+
+  short color;
+  short ignoreood;
+  short sortorder;
+  int force:1;
+  int getdeps:1;
+  int quiet:1;
+  int skiprepos:1;
+  int frompkgbuild:1;
+  int maxthreads;
+  long timeout;
+
+  int (*sort_fn)(const aurpkg_t*, const aurpkg_t*);
+
+  alpm_list_t *targets;
+  struct {
+    alpm_list_t *pkgs;
+    alpm_list_t *repos;
+  } ignore;
+} cfg = {
+  .sortorder = SORT_FORWARD,
+  .timeout = 10L,
+  .delim = kListDelim,
+  .maxthreads = 10,
+  .logmask = LOG_ERROR|LOG_WARN|LOG_INFO,
+  .sort_fn = aurpkg_cmpname,
 };
 
 int streq(const char *s1, const char *s2)
@@ -355,10 +362,13 @@ alpm_handle_t *alpm_init(void)
       }
     }
   }
+  free(section);
 
   db_local = alpm_get_localdb(pmhandle);
 
-  free(section);
+  /* hack: prepopulate the package cache to avoid potentially doing it after
+   * thread creation. */
+  alpm_db_get_pkgcache(db_local);
 
   return pmhandle;
 }
@@ -504,7 +514,7 @@ int globcompare(const void *a, const void *b)
   return fnmatch(a, b, 0);
 }
 
-int have_results(aurpkg_t **packages) {
+int have_unignored_results(aurpkg_t **packages) {
   aurpkg_t **p;
 
   if (packages == NULL) {
@@ -755,9 +765,9 @@ int should_ignore_package(const aurpkg_t *package, regex_t *pattern) {
   return 1;
 }
 
-void filter_results(aurpkg_t **packages) {
+aurpkg_t **filter_results(aurpkg_t **packages) {
   if (packages == NULL) {
-    return;
+    return NULL;
   }
 
   dedupe_results(packages);
@@ -782,6 +792,8 @@ void filter_results(aurpkg_t **packages) {
       regfree(&regex);
     }
   }
+
+  return packages;
 }
 
 int getcols(void)
@@ -1299,7 +1311,7 @@ int parse_options(int argc, char *argv[])
         break;
       case OP_TIMEOUT:
         cfg.timeout = strtol(optarg, &token, 10);
-        if(*token != '\0') {
+        if(*token != '\0' || cfg.timeout < 0) {
           fprintf(stderr, "error: invalid argument to --timeout\n");
           return 1;
         }
@@ -2153,24 +2165,52 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) {
   return 0;
 }
 
-int main(int argc, char *argv[]) {
+aurpkg_t **cower_perform(struct task_t *task, int num_threads) {
   aurpkg_t **results = NULL;
-  int ret, n, num_threads;
   _cleanup_free_ pthread_t *threads = NULL;
+  int i;
+
+  threads = malloc(num_threads * sizeof(*threads));
+  if (threads == NULL) {
+    return NULL;
+  }
+
+  for (i = 0; i < num_threads; i++) {
+    int r;
+
+    r = pthread_create(&threads[i], NULL, thread_pool, task);
+    if(r != 0) {
+      cwr_fprintf(stderr, LOG_ERROR, "failed to spawn new thread: %s\n",
+          strerror(r));
+      return NULL;
+    }
+  }
+
+  for (i = 0; i < num_threads; i++) {
+    aurpkg_t **thread_return;
+
+    pthread_join(threads[i], (void**)&thread_return);
+    if (thread_return != NULL) {
+      int r;
+
+      r = aur_packages_append(&results, thread_return);
+      if (r < 0) {
+        cwr_fprintf(stderr, LOG_ERROR,
+            "failed to append thread result to package list: %s\n", strerror(-r));
+      }
+    }
+  }
+
+  return filter_results(results);
+}
+
+int main(int argc, char *argv[]) {
+  int num_threads, ret;
+  aurpkg_t **results;
   void (*printfn)(aurpkg_t*) = NULL;
   struct task_t task;
 
   setlocale(LC_ALL, "");
-
-  /* initialize config */
-  cfg.color = 0;
-  cfg.timeout = kTimeoutDefault;
-  cfg.delim = kListDelim;
-  cfg.maxthreads = kThreadDefault;
-  cfg.logmask = LOG_ERROR|LOG_WARN|LOG_INFO;
-  cfg.ignoreood = 0;
-  cfg.sort_fn = aurpkg_cmpname;
-  cfg.sortorder = SORT_FORWARD;
 
   ret = parse_configfile();
   if (ret != 0) {
@@ -2205,7 +2245,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  cwr_printf(LOG_DEBUG, "initializing curl\n");
   openssl_crypto_init();
 
   pmhandle = alpm_init();
@@ -2223,21 +2262,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  workq = cfg.targets;
-  num_threads = alpm_list_count(cfg.targets);
-  if(num_threads == 0) {
-    fprintf(stderr, "error: no targets specified (use -h for help)\n");
-    goto finish;
-  } else if(num_threads > cfg.maxthreads) {
-    num_threads = cfg.maxthreads;
-  }
-
-  threads = malloc(num_threads * sizeof(pthread_t));
-  if(threads == NULL) {
-    cwr_fprintf(stderr, LOG_ERROR, "could not allocate memory for threads\n");
-    goto finish;
-  }
-
   /* override task behavior */
   if(cfg.opmask & OP_UPDATE) {
     task.threadfn = task_update;
@@ -2251,43 +2275,26 @@ int main(int argc, char *argv[]) {
     task.threadfn = task_download;
   }
 
-  /* hack: prepopulate the package cache to avoid potentially doing it after
-   * thread creation. */
-  alpm_db_get_pkgcache(db_local);
+  workq = cfg.targets;
 
-  for (n = 0; n < num_threads; n++) {
-    ret = pthread_create(&threads[n], NULL, thread_pool, &task);
-    if(ret != 0) {
-      cwr_fprintf(stderr, LOG_ERROR, "failed to spawn new thread: %s\n",
-          strerror(ret));
-      return ret ; /* we don't want to recover from this */
-    }
+  num_threads = alpm_list_count(cfg.targets);
+  if(num_threads == 0) {
+    fprintf(stderr, "error: no targets specified (use -h for help)\n");
+    goto finish;
+  } else if(num_threads > cfg.maxthreads) {
+    num_threads = cfg.maxthreads;
   }
 
-  for (n = 0; n < num_threads; n++) {
-    aurpkg_t **thread_return;
-    pthread_join(threads[n], (void**)&thread_return);
-
-    if (thread_return != NULL) {
-      int r;
-
-      r = aur_packages_append(&results, thread_return);
-      if (r < 0) {
-        cwr_fprintf(stderr, LOG_ERROR,
-            "failed to append thread result to package list: %s\n", strerror(-r));
-      }
-    }
-  }
-
-  filter_results(results);
+  results = cower_perform(&task, num_threads);
 
   /* we need to exit with a non-zero value when:
    * a) search/info/download returns nothing
    * b) update (without download) returns something
    * this is opposing behavior, so just XOR the result on a pure update */
-  ret = (!have_results(results) ^ !(cfg.opmask & ~OP_UPDATE));
+  ret = (!have_unignored_results(results) ^ !(cfg.opmask & ~OP_UPDATE));
 
   print_results(results, printfn);
+
   aur_packages_free(results);
 
   openssl_crypto_cleanup();
