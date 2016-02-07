@@ -684,15 +684,20 @@ aurpkg_t **download(struct task_t *task, const char *package)
     return NULL;
   }
 
-  if(access(package, F_OK) == 0 && !cfg.force) {
+  cwr_printf(LOG_DEBUG, "package %s is part of pkgbase %s\n", package, result[0]->pkgbase);
+
+  if(access(result[0]->pkgbase, F_OK) == 0 && !cfg.force) {
     cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
-        cfg.working_dir, package);
+        cfg.working_dir, result[0]->pkgbase);
     aur_packages_free(result);
     return NULL;
   }
 
   url = aur_build_url(task->aur, result[0]->aur_urlpath);
+  if (url == NULL) {
+    return NULL;
+  }
 
   task_reset_for_download(task, url, &response);
   if (task_http_execute(task, url, package) != 0) {
@@ -1909,6 +1914,9 @@ aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
   int r, packagecount;
 
   url = aur_build_rpc_url(task->aur, method, arg);
+  if (url == NULL) {
+    return NULL;
+  }
 
   task_reset_for_rpc(task, url, &response);
   if (task_http_execute(task, url, arg) != 0) {
