@@ -1785,12 +1785,12 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 
   sanitized[strcspn(sanitized, "<>=")] = '\0';
 
-  if(!alpm_list_find_str(cfg.targets, sanitized)) {
+  if (!alpm_list_find_str(cfg.targets, sanitized)) {
     pthread_mutex_lock(&listlock);
     cfg.targets = alpm_list_add(cfg.targets, sanitized);
     pthread_mutex_unlock(&listlock);
   } else {
-    if(cfg.logmask & LOG_BRIEF &&
+    if (cfg.logmask & LOG_BRIEF &&
             !alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
         cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\n", sanitized);
     }
@@ -1798,13 +1798,11 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
     return;
   }
 
-  if(sanitized) {
-    if(alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-      cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
-    } else {
-      if(!pkg_is_binary(depend)) {
-        aur_packages_free(task_download(task, sanitized));
-      }
+  if (alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
+    cwr_printf(LOG_DEBUG, "%s is already satisified\n", depend);
+  } else {
+    if (!pkg_is_binary(depend)) {
+      aur_packages_free(task_download(task, sanitized));
     }
   }
 
