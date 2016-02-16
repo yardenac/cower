@@ -12,16 +12,50 @@ endif
 PREFIX    ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
 
-OBJ        =
+BUILD      = release
 
+warning_flags = \
+	-Wclobbered \
+	-Wempty-body \
+	-Wfloat-equal \
+	-Wignored-qualifiers \
+	-Wmissing-declarations \
+	-Wmissing-parameter-type \
+	-Wsign-compare \
+	-Wmissing-prototypes \
+	-Wold-style-declaration \
+	-Wtype-limits \
+	-Woverride-init \
+	-Wunused \
+	-Wstrict-prototypes \
+	-Wuninitialized
+
+# build configurations
+cflags.common  = $(warning_flags) -std=c99 -g -pthread -pedantic -Wall -Wextra -fstack-protector-strong
+
+cflags.release = -O2
+
+cflags.debug = -fvar-tracking-assignments -gdwarf-4
+
+cflags.tsan = -fsanitize=thread
+ldflags.tsan = -fsanitize=thread
+
+cflags.asan = -fsanitize=address
+ldflags.asan = -fsanitize=address
+
+# global flag definitions
 CPPFLAGS  := -D_GNU_SOURCE -DCOWER_VERSION=\"$(VERSION)\" $(CPPFLAGS)
-CFLAGS    := -std=c99 -g -pedantic -Wall -Wextra -pthread $(CFLAGS)
-LDFLAGS   := -pthread $(LDFLAGS)
+CFLAGS    := $(cflags.common) $(cflags.$(BUILD)) $(CFLAGS)
+LDFLAGS   := -pthread $(ldflags.$(BUILD)) $(LDFLAGS)
 LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto
 
 bash_completiondir = /usr/share/bash-completion/completions
 
+# default target
 all: $(OUT) doc
+
+# object rules
+OBJ=
 
 aur.o: \
 	aur.c \
@@ -42,16 +76,14 @@ cower: \
 	package.o \
 	cower.o
 
+# documentation
 MANPAGES = \
 	cower.1
-
 doc: $(MANPAGES)
 cower.1: README.pod
 	pod2man --section=1 --center="Cower Manual" --name="COWER" --release="cower $(VERSION)" $< $@
 
-strip: $(OUT)
-	strip --strip-all $(OUT)
-
+# aux
 install: all
 	install -D -m755 cower "$(DESTDIR)$(PREFIX)/bin/cower"
 	install -D -m644 cower.1 "$(DESTDIR)$(MANPREFIX)/man1/cower.1"
