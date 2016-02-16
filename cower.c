@@ -1356,6 +1356,7 @@ int parse_options(int argc, char *argv[])
 
         return 1;
       }
+      regfree(&regex);
     }
   }
 
