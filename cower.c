@@ -1698,6 +1698,9 @@ void print_pkg_info(aurpkg_t *pkg)
   print_colored("URL", colstr.url, pkg->upstream_url);
   printf("AUR Page       : %shttps://%s/packages/%s%s\n",
       colstr.url, arg_aur_domain, pkg->name, colstr.nc);
+  if (pkg->keywords) {
+    print_extinfo_list(pkg->keywords, "Keywords", kListDelim, 1);
+  }
 
   print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
   print_extinfo_list(pkg->makedepends, "Makedepends", kListDelim, 1);
@@ -1989,7 +1992,7 @@ aurpkg_t **task_query(struct task_t *task, void *arg) {
   if (cfg.opmask & OP_SEARCH) {
     return rpc_search(task, arg);
   } else if (cfg.opmask & OP_MSEARCH) {
-    return rpc_do(task, "msearch", arg);
+    return rpc_do(task, "search&by=maintainer", arg);
   } else {
     return rpc_do(task, "info", arg);
   }

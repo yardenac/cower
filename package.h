@@ -30,6 +30,7 @@ struct aurpkg_t {
   char **checkdepends;
   char **provides;
   char **replaces;
+  char **keywords;
 
   int ignored;
 };

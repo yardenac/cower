@@ -46,6 +46,7 @@ void aur_package_free(aurpkg_t *package) {
   free_strv(package->checkdepends);
   free_strv(package->provides);
   free_strv(package->replaces);
+  free_strv(package->keywords);
 
   free(package);
 }
@@ -113,12 +114,16 @@ static int copy_to_array(yajl_val node, char ***l) {
   char **t;
   size_t i;
 
-  t = calloc(node->u.array.len + 1, sizeof(char*));
+  if (YAJL_GET_ARRAY(node)->len == 0) {
+    return 0;
+  }
+
+  t = calloc(YAJL_GET_ARRAY(node)->len + 1, sizeof(char*));
   if (t == NULL) {
     return -ENOMEM;
   }
 
-  for (i = 0; i < node->u.array.len; ++i) {
+  for (i = 0; i < YAJL_GET_ARRAY(node)->len; ++i) {
     int r;
 
     r = copy_to_string(YAJL_GET_ARRAY(node)->values[i], &t[i]);
@@ -147,8 +152,9 @@ static int copy_to_object(yajl_val node, struct json_descriptor_t table[], size_
     }
 
     /* don't handle this, just leave the field empty */
-    if (v->type == yajl_t_null)
+    if (v->type == yajl_t_null) {
       continue;
+    }
 
     if (v->type != json_desc->type) {
       fprintf(stderr, "error: type mismatch for key=%s: got=%d, expected=%d\n", k, v->type, json_desc->type);
@@ -192,6 +198,7 @@ int aur_packages_from_json(const char *json, aurpkg_t ***packages, int *count) {
     {"FirstSubmitted", yajl_t_number, offsetof(aurpkg_t, submitted_s) },
     {"Groups",         yajl_t_array,  offsetof(aurpkg_t, groups) },
     {"ID",             yajl_t_number, offsetof(aurpkg_t, package_id) },
+    {"Keywords",       yajl_t_array,  offsetof(aurpkg_t, keywords) },
     {"LastModified",   yajl_t_number, offsetof(aurpkg_t, modified_s) },
     {"License",        yajl_t_array,  offsetof(aurpkg_t, licenses) },
     {"Maintainer",     yajl_t_string, offsetof(aurpkg_t, maintainer) },

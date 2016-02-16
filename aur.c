@@ -14,8 +14,7 @@ static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
   char *out, *p;
 
   va_copy(aq, ap);
-  len = strlen(aur->urlprefix) + strlen("/") +
-      vsnprintf(NULL, 0, urlpath_format, aq) + 1;
+  len = strlen(aur->urlprefix) + vsnprintf(NULL, 0, urlpath_format, aq) + 1;
   va_end(aq);
 
   out = malloc(len);
@@ -24,7 +23,6 @@ static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
   }
 
   p = stpcpy(out, aur->urlprefix);
-  *p++ = '/';
   p += vsprintf(p, urlpath_format, ap);
   *p = '\0';
 
@@ -44,13 +42,18 @@ static char *aur_urlf(aur_t *aur, const char *urlpath_format, ...) {
 
 char *aur_build_rpc_url(aur_t *aur, const char *method, const char *arg) {
   char *escaped, *url;
+  const char *argkey = "arg";
 
   escaped = curl_easy_escape(NULL, arg, 0);
   if (escaped == NULL) {
     return NULL;
   }
 
-  url = aur_urlf(aur, "/rpc.php?v=%d&type=%s&arg=%s", aur->rpc_version, method, escaped);
+  if (strcmp(method, "info") == 0) {
+    argkey = "arg[]";
+  }
+
+  url = aur_urlf(aur, "/rpc.php?v=%d&type=%s&%s=%s", aur->rpc_version, method, argkey, escaped);
   free(escaped);
 
   return url;
@@ -81,7 +84,7 @@ int aur_new(const char *proto, const char *domain, aur_t **aur) {
     return -ENOMEM;
   }
 
-  a->rpc_version = 4;
+  a->rpc_version = 5;
 
   *aur = a;
   return 0;
