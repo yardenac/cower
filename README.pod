@@ -175,8 +175,6 @@ formatter:
 
   %i    id
 
-  %l    license
-
   %m    maintainer
 
   %n    name
@@ -213,6 +211,10 @@ B<--listdelim> option.
   %P    provides
 
   %R    replaces
+
+  %L    licenses
+
+  %W    keywords
 
 Full printf formatter support with justification and field width is supported,
 e.g. '%-20o'. Simple backslash escape sequences are also honored for lowercase

@@ -1634,7 +1634,10 @@ void print_pkg_formatted(aurpkg_t *pkg)
         case 'R':
           print_extinfo_list(pkg->replaces, NULL, cfg.delim, 0);
           break;
-        case 'l':
+        case 'W':
+          print_extinfo_list(pkg->keywords, NULL, cfg.delim, 0);
+          break;
+        case 'L':
           print_extinfo_list(pkg->licenses, NULL, cfg.delim, 0);
           break;
         case '%':
