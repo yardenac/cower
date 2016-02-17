@@ -145,7 +145,7 @@ struct buffer_t {
 struct task_t {
   struct aur_t *aur;
   CURL *curl;
-  aurpkg_t **(*threadfn)(struct task_t*, void*);
+  aurpkg_t **(*threadfn)(struct task_t*, const char*);
 };
 
 /* function prototypes */
@@ -213,9 +213,9 @@ static int task_http_execute(struct task_t *, const char *, const char *);
 static void task_reset(struct task_t *, const char *, void *);
 static void task_reset_for_download(struct task_t *, const char *, void *);
 static void task_reset_for_rpc(struct task_t *, const char *, void *);
-static aurpkg_t **task_download(struct task_t*, void*);
-static aurpkg_t **task_query(struct task_t*, void*);
-static aurpkg_t **task_update(struct task_t*, void*);
+static aurpkg_t **task_download(struct task_t*, const char*);
+static aurpkg_t **task_query(struct task_t*, const char*);
+static aurpkg_t **task_update(struct task_t*, const char*);
 static void *thread_pool(void*);
 static void usage(void);
 static void version(void);
@@ -1903,7 +1903,7 @@ size_t strtrim(char *str)
   return right - left;
 }
 
-aurpkg_t **task_download(struct task_t *task, void *arg)
+aurpkg_t **task_download(struct task_t *task, const char *arg)
 {
   if(pkg_is_binary(arg)) {
     return NULL;
@@ -1990,7 +1990,7 @@ aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
   return rpc_do(task, "search", fragment);
 }
 
-aurpkg_t **task_query(struct task_t *task, void *arg) {
+aurpkg_t **task_query(struct task_t *task, const char *arg) {
   if (cfg.opmask & OP_SEARCH) {
     return rpc_search(task, arg);
   } else if (cfg.opmask & OP_MSEARCH) {
@@ -2000,13 +2000,12 @@ aurpkg_t **task_query(struct task_t *task, void *arg) {
   }
 }
 
-aurpkg_t **task_update(struct task_t *task, void *arg) {
+aurpkg_t **task_update(struct task_t *task, const char *arg) {
   aurpkg_t **packages;
   alpm_pkg_t *pmpkg;
-  const char *candidate = arg;
 
   cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
-      colstr.pkg, candidate, colstr.nc);
+      colstr.pkg, arg, colstr.nc);
 
   packages = rpc_info(task, arg);
   if (packages == NULL) {
@@ -2015,8 +2014,7 @@ aurpkg_t **task_update(struct task_t *task, void *arg) {
 
   pmpkg = alpm_db_get_pkg(db_local, arg);
   if(!pmpkg) {
-    cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n",
-        candidate);
+    cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n", arg);
     goto finish;
   }
 
@@ -2024,7 +2022,7 @@ aurpkg_t **task_update(struct task_t *task, void *arg) {
     if(alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
       if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
         cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
-            colstr.pkg, candidate, colstr.nc,
+            colstr.pkg, arg, colstr.nc,
             colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
             colstr.utd, packages[0]->version, colstr.nc);
       }
@@ -2035,10 +2033,10 @@ aurpkg_t **task_update(struct task_t *task, void *arg) {
       aur_packages_free(task_download(task, packages[0]->name));
     } else {
       if(cfg.quiet) {
-        printf("%s%s%s\n", colstr.pkg, candidate, colstr.nc);
+        printf("%s%s%s\n", colstr.pkg, arg, colstr.nc);
       } else {
         cwr_printf(LOG_INFO, "%s%s %s%s%s -> %s%s%s\n",
-            colstr.pkg, candidate,
+            colstr.pkg, arg,
             colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
             colstr.utd, packages[0]->version, colstr.nc);
       }
