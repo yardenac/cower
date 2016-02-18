@@ -8,6 +8,26 @@
 
 #include <curl/curl.h>
 
+struct rpc_method_t {
+  const char* type;
+  const char* argkey;
+};
+
+static const struct rpc_method_t method_table[] = {
+  [RPC_SEARCH] = {
+    .type = "type=search",
+    .argkey = "arg"
+  },
+  [RPC_SEARCH_BY_MAINTAINER] = {
+    "type=search&by=maintainer",
+    .argkey = "arg"
+  },
+  [RPC_INFO] = {
+    "type=info",
+    .argkey = "arg[]"
+  },
+};
+
 static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
   int len;
   va_list aq;
@@ -40,20 +60,17 @@ static char *aur_urlf(aur_t *aur, const char *urlpath_format, ...) {
   return out;
 }
 
-char *aur_build_rpc_url(aur_t *aur, const char *method, const char *arg) {
+char *aur_build_rpc_url(aur_t *aur, rpc_type type, const char *arg) {
   char *escaped, *url;
-  const char *argkey = "arg";
+  const struct rpc_method_t *method = &method_table[type];
 
   escaped = curl_easy_escape(NULL, arg, 0);
   if (escaped == NULL) {
     return NULL;
   }
 
-  if (strcmp(method, "info") == 0) {
-    argkey = "arg[]";
-  }
-
-  url = aur_urlf(aur, "/rpc.php?v=%d&type=%s&%s=%s", aur->rpc_version, method, argkey, escaped);
+  url = aur_urlf(aur, "/rpc.php?v=%d&%s&%s=%s", aur->rpc_version,
+      method->type, method->argkey, escaped);
   free(escaped);
 
   return url;

@@ -202,7 +202,7 @@ static void print_results(aurpkg_t **, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static void resolve_one_dep(struct task_t *task, const char *depend);
 static void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
-static aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg);
+static aurpkg_t **rpc_do(struct task_t *task, rpc_type type, const char *arg);
 static aurpkg_t **rpc_info(struct task_t *task, const char *arg);
 static aurpkg_t **rpc_search(struct task_t *task, const char *arg);
 static int ch_working_dir(void);
@@ -1912,13 +1912,13 @@ aurpkg_t **task_download(struct task_t *task, const char *arg)
   }
 }
 
-aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
+aurpkg_t **rpc_do(struct task_t *task, rpc_type type, const char *arg) {
   struct buffer_t response = { NULL, 0, 0 };
   _cleanup_free_ char *url = NULL;
   aurpkg_t **packages = NULL;
   int r, packagecount;
 
-  url = aur_build_rpc_url(task->aur, method, arg);
+  url = aur_build_rpc_url(task->aur, type, arg);
   if (url == NULL) {
     return NULL;
   }
@@ -1934,8 +1934,8 @@ aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
     return NULL;
   }
 
-  cwr_printf(LOG_DEBUG, "rpc %s request for %s returned %d results\n",
-      method, arg, packagecount);
+  cwr_printf(LOG_DEBUG, "rpc %d request for %s returned %d results\n",
+      type, arg, packagecount);
 
   free(response.data);
 
@@ -1943,7 +1943,7 @@ aurpkg_t **rpc_do(struct task_t *task, const char *method, const char *arg) {
 }
 
 aurpkg_t **rpc_info(struct task_t *task, const char *arg) {
-  return rpc_do(task, "info", arg);
+  return rpc_do(task, RPC_INFO, arg);
 }
 
 aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
@@ -1987,16 +1987,16 @@ aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
 
   cwr_printf(LOG_DEBUG, "searching with fragment '%s' from '%s'\n", fragment, arg);
 
-  return rpc_do(task, "search", fragment);
+  return rpc_do(task, RPC_SEARCH, fragment);
 }
 
 aurpkg_t **task_query(struct task_t *task, const char *arg) {
   if (cfg.opmask & OP_SEARCH) {
     return rpc_search(task, arg);
   } else if (cfg.opmask & OP_MSEARCH) {
-    return rpc_do(task, "search&by=maintainer", arg);
+    return rpc_do(task, RPC_SEARCH_BY_MAINTAINER, arg);
   } else {
-    return rpc_do(task, "info", arg);
+    return rpc_do(task, RPC_INFO, arg);
   }
 }
 
