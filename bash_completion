@@ -20,7 +20,7 @@ _cower() {
 
   local shortopts=(-d -i -m -s -u -f -h -t -V -b -c -o -q -v)
   local longopts=(--download --info --msearch --search --update --force --version
-                  --brief --debug --ignore-ood --no-ignore-ood --quiet --verbose)
+                  --brief --debug --ignore-ood --no-ignore-ood --quiet --verbose --by)
   local longoptsarg=(--ignore --ignorerepo --target --threads --timeout --color --format
                      --sort --rsort -listdelim)
   local allopts=("${shortopts[@]}" "${longopts[@]}" "${longoptsarg[@]}")
@@ -57,6 +57,10 @@ _cower() {
       ;;
     --ignorerepo)
       COMPREPLY=($(compgen -W "$(sed '/^\[\(.*\)\]$/!d;s//\1/;/options/d' /etc/pacman.conf)" -- "$cur"))
+      return 0
+      ;;
+    --by)
+      COMPREPLY=($(compgen -W 'name name-desc maintainer' -- "$cur"))
       return 0
       ;;
   esac

@@ -113,7 +113,6 @@ typedef enum __operation_t {
   OP_INFO     = (1 << 1),
   OP_DOWNLOAD = (1 << 2),
   OP_UPDATE   = (1 << 3),
-  OP_MSEARCH  = (1 << 4)
 } operation_t;
 
 enum {
@@ -128,6 +127,7 @@ enum {
   OP_TIMEOUT,
   OP_NOIGNOREOOD,
   OP_AURDOMAIN,
+  OP_SEARCHBY,
 };
 
 enum {
@@ -148,6 +148,7 @@ struct task_t {
 };
 
 /* function prototypes */
+static int allow_regex(void);
 static inline int streq(const char *, const char *);
 static inline int startswith(const char *, const char *);
 static alpm_list_t *alpm_find_foreign_pkgs(void);
@@ -219,8 +220,6 @@ static void *thread_pool(void*);
 static void usage(void);
 static void version(void);
 
-static char *arg_aur_domain = "aur.archlinux.org";
-
 /* globals */
 static alpm_handle_t *pmhandle;
 static alpm_db_t *db_local;
@@ -262,6 +261,9 @@ static struct {
 
 /* runtime configuration */
 static struct {
+  const char *aur_domain;
+  rpc_by search_by;
+
   char *working_dir;
   const char *delim;
   const char *format;
@@ -288,6 +290,8 @@ static struct {
     alpm_list_t *repos;
   } ignore;
 } cfg = {
+  .aur_domain = "aur.archlinux.org",
+  .search_by = SEARCHBY_NAME_DESC,
   .sortorder = SORT_FORWARD,
   .timeout = 10L,
   .delim = kListDelim,
@@ -295,6 +299,10 @@ static struct {
   .logmask = LOG_ERROR|LOG_WARN|LOG_INFO,
   .sort_fn = aurpkg_cmpname,
 };
+
+int allow_regex() {
+  return cfg.opmask & OP_SEARCH && cfg.search_by != SEARCHBY_MAINTAINER;
+}
 
 int streq(const char *s1, const char *s2)
 {
@@ -757,11 +765,12 @@ aurpkg_t **dedupe_results(aurpkg_t **packages) {
 }
 
 int should_ignore_package(const aurpkg_t *package, regex_t *pattern) {
-  if (regexec(pattern, package->name, 0, 0, 0) != REG_NOMATCH) {
+  if ((cfg.search_by == SEARCHBY_NAME || cfg.search_by == SEARCHBY_NAME_DESC) &&
+      regexec(pattern, package->name, 0, 0, 0) != REG_NOMATCH) {
     return 0;
   }
 
-  if (package->description &&
+  if (cfg.search_by == SEARCHBY_NAME_DESC && package->description &&
       regexec(pattern, package->description, 0, 0, 0) != REG_NOMATCH) {
     return 0;
   }
@@ -776,7 +785,7 @@ aurpkg_t **filter_results(aurpkg_t **packages) {
 
   dedupe_results(packages);
 
-  if (cfg.opmask & OP_SEARCH) {
+  if (allow_regex()) {
     const alpm_list_t *i;
 
     for (i = cfg.targets; i; i = i->next) {
@@ -1175,6 +1184,7 @@ int parse_options(int argc, char *argv[])
 
     /* options */
     {"brief",         no_argument,        0, 'b'},
+    {"by",            required_argument,  0, OP_SEARCHBY},
     {"color",         optional_argument,  0, 'c'},
     {"debug",         no_argument,        0, OP_DEBUG},
     {"domain",        required_argument,  0, OP_AURDOMAIN},
@@ -1220,7 +1230,8 @@ int parse_options(int argc, char *argv[])
         }
         break;
       case 'm':
-        cfg.opmask |= OP_MSEARCH;
+        cfg.opmask |= OP_SEARCH;
+        cfg.search_by = SEARCHBY_MAINTAINER;
         break;
 
       /* options */
@@ -1301,7 +1312,7 @@ int parse_options(int argc, char *argv[])
         cfg.ignoreood = 0;
         break;
       case OP_AURDOMAIN:
-        arg_aur_domain = optarg;
+        cfg.aur_domain = optarg;
         break;
       case OP_LISTDELIM:
         cfg.delim = optarg;
@@ -1309,15 +1320,26 @@ int parse_options(int argc, char *argv[])
       case OP_THREADS:
         cfg.maxthreads = strtol(optarg, &token, 10);
         if(*token != '\0' || cfg.maxthreads <= 0) {
-          fprintf(stderr, "error: invalid argument to --threads\n");
+          fprintf(stderr, "error: invalid argument to --threads: %s\n", optarg);
           return 1;
         }
         break;
       case OP_TIMEOUT:
         cfg.timeout = strtol(optarg, &token, 10);
         if(*token != '\0' || cfg.timeout < 0) {
-          fprintf(stderr, "error: invalid argument to --timeout\n");
+          fprintf(stderr, "error: invalid argument to --timeout: %s\n", optarg);
           return 1;
+        }
+        break;
+      case OP_SEARCHBY:
+        if (streq(optarg, "maintainer")) {
+          cfg.search_by = SEARCHBY_MAINTAINER;
+        } else if (streq(optarg, "name-desc")) {
+          cfg.search_by = SEARCHBY_NAME_DESC;
+        } else if (streq(optarg, "name")) {
+          cfg.search_by = SEARCHBY_NAME;
+        } else {
+          fprintf(stderr, "error: invalid argument to --by: %s\n", optarg);
         }
         break;
       case '?':
@@ -1333,13 +1355,13 @@ int parse_options(int argc, char *argv[])
 
 #define NOT_EXCL(val) (cfg.opmask & (val) && (cfg.opmask & ~(val)))
   /* check for invalid operation combos */
-  if(NOT_EXCL(OP_INFO) || NOT_EXCL(OP_SEARCH) || NOT_EXCL(OP_MSEARCH) ||
+  if(NOT_EXCL(OP_INFO) || NOT_EXCL(OP_SEARCH) ||
       NOT_EXCL(OP_UPDATE|OP_DOWNLOAD)) {
     fprintf(stderr, "error: invalid operation\n");
     return 1;
   }
 
-  if (cfg.opmask & OP_SEARCH) {
+  if (allow_regex()) {
     int i;
 
     for (i = optind; i < argc; i++) {
@@ -1592,7 +1614,7 @@ void print_pkg_formatted(aurpkg_t *pkg)
           printf(fmt, buf);
           break;
         case 'p':
-          snprintf(buf, 64, "https://%s/packages/%s", arg_aur_domain,pkg->name);
+          snprintf(buf, 64, "https://%s/packages/%s", cfg.aur_domain, pkg->name);
           printf(fmt, buf);
           break;
         case 'r':
@@ -1700,7 +1722,7 @@ void print_pkg_info(aurpkg_t *pkg)
   print_colored("Version", pkg->out_of_date ? colstr.ood : colstr.utd, pkg->version);
   print_colored("URL", colstr.url, pkg->upstream_url);
   printf("AUR Page       : %shttps://%s/packages/%s%s\n",
-      colstr.url, arg_aur_domain, pkg->name, colstr.nc);
+      colstr.url, cfg.aur_domain, pkg->name, colstr.nc);
   if (pkg->keywords) {
     print_extinfo_list(pkg->keywords, "Keywords", kListDelim, 1);
   }
@@ -1917,7 +1939,7 @@ aurpkg_t **rpc_do(struct task_t *task, rpc_type type, const char *arg) {
   aurpkg_t **packages = NULL;
   int r, packagecount;
 
-  url = aur_build_rpc_url(task->aur, type, arg);
+  url = aur_build_rpc_url(task->aur, type, cfg.search_by, arg);
   if (url == NULL) {
     return NULL;
   }
@@ -1990,10 +2012,10 @@ aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
 }
 
 aurpkg_t **task_query(struct task_t *task, const char *arg) {
-  if (cfg.opmask & OP_SEARCH) {
+  if (allow_regex()) {
     return rpc_search(task, arg);
-  } else if (cfg.opmask & OP_MSEARCH) {
-    return rpc_do(task, RPC_SEARCH_BY_MAINTAINER, arg);
+  } else if (cfg.opmask & OP_SEARCH) {
+    return rpc_do(task, RPC_SEARCH, arg);
   } else {
     return rpc_do(task, RPC_INFO, arg);
   }
@@ -2105,6 +2127,7 @@ void usage(void)
       "  -u, --update              check for updates against AUR -- can be combined "
                                      "with the -d flag\n\n");
   fprintf(stderr, " General options:\n"
+      "      --by <search-by>      search by one of 'name', 'name-desc', or 'maintainer'\n"
       "      --domain <fqdn>       point cower at a different AUR (default: aur.archlinux.org)\n"
       "  -f, --force               overwrite existing files when downloading\n"
       "  -h, --help                display this help and exit\n"
@@ -2232,7 +2255,7 @@ int main(int argc, char *argv[]) {
     return ret;
   }
 
-  ret = aur_new("https", arg_aur_domain, &task.aur);
+  ret = aur_new("https", cfg.aur_domain, &task.aur);
   if (ret < 0) {
     fprintf(stderr, "error: aur_new failed: %s\n", strerror(-ret));
     return 1;
@@ -2278,7 +2301,7 @@ int main(int argc, char *argv[]) {
   } else if(cfg.opmask & OP_INFO) {
     task.threadfn = task_query;
     printfn = cfg.format ? print_pkg_formatted : print_pkg_info;
-  } else if(cfg.opmask & (OP_SEARCH|OP_MSEARCH)) {
+  } else if(cfg.opmask & OP_SEARCH) {
     task.threadfn = task_query;
     printfn = cfg.format ? print_pkg_formatted : print_pkg_search;
   } else if(cfg.opmask & OP_DOWNLOAD) {

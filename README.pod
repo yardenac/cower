@@ -28,7 +28,8 @@ Show info for I<target>.
 
 =item B<-m, --msearch>
 
-Search for packages maintained by I<target>.
+Search for packages maintained by I<target>. This is a synonym for searching with
+B<--by=>I<maintainer>.
 
 =item B<-s, --search>
 
@@ -62,6 +63,18 @@ if updates are available.
 
 Show output in a more script friendly format. Use this if you're wrapping cower
 for some sort of automation.
+
+=item B<--by=>I<what>
+
+Search by one of I<name>, I<name-desc>, or I<maintainer> to search for packages
+by their name, name and description, or by the package maintainer,
+respectively. This option only makes sense with the B<--search> command. The
+default is to search by I<name-desc>.
+
+B<Note:> this also has an effect on how regular expressions are applied to the
+returned results. When searching by I<name>, the pattern will only apply to the
+name and not the description. Regular expressions are never applied when
+searching by I<maintainer>.
 
 =item B<-c>, B<--color>[B<=>I<WHEN>]
 

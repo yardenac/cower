@@ -16,16 +16,18 @@ struct rpc_method_t {
 static const struct rpc_method_t method_table[] = {
   [RPC_SEARCH] = {
     .type = "type=search",
-    .argkey = "arg"
-  },
-  [RPC_SEARCH_BY_MAINTAINER] = {
-    "type=search&by=maintainer",
-    .argkey = "arg"
+    .argkey = "arg",
   },
   [RPC_INFO] = {
-    "type=info",
-    .argkey = "arg[]"
+    .type = "type=info",
+    .argkey = "arg[]",
   },
+};
+
+static const char *search_by_to_string[] = {
+  [SEARCHBY_NAME]       = "name",
+  [SEARCHBY_NAME_DESC]  = "name-desc",
+  [SEARCHBY_MAINTAINER] = "maintainer",
 };
 
 static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
@@ -60,7 +62,7 @@ static char *aur_urlf(aur_t *aur, const char *urlpath_format, ...) {
   return out;
 }
 
-char *aur_build_rpc_url(aur_t *aur, rpc_type type, const char *arg) {
+char *aur_build_rpc_url(aur_t *aur, rpc_type type, rpc_by by, const char *arg) {
   char *escaped, *url;
   const struct rpc_method_t *method = &method_table[type];
 
@@ -69,8 +71,17 @@ char *aur_build_rpc_url(aur_t *aur, rpc_type type, const char *arg) {
     return NULL;
   }
 
-  url = aur_urlf(aur, "/rpc.php?v=%d&%s&%s=%s", aur->rpc_version,
-      method->type, method->argkey, escaped);
+  switch (type) {
+  case RPC_SEARCH:
+    url = aur_urlf(aur, "/rpc.php?v=%d&%s&%s=%s&by=%s", aur->rpc_version,
+        method->type, method->argkey, escaped, search_by_to_string[by]);
+    break;
+  default:
+    url = aur_urlf(aur, "/rpc.php?v=%d&%s&%s=%s", aur->rpc_version,
+        method->type, method->argkey, escaped);
+    break;
+  }
+
   free(escaped);
 
   return url;
