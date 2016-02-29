@@ -1065,7 +1065,7 @@ int parse_configfile(void)
 {
   char line[BUFSIZ], config_path[PATH_MAX];
   int r = 0;
-  FILE *fp;
+  _cleanup_fclose_ FILE *fp = NULL;
 
   if(get_config_path(config_path, sizeof(config_path)) != 0) {
     return 0;
