@@ -173,6 +173,7 @@ static int cwr_vfprintf(FILE*, loglevel_t, const char*, va_list) __attribute__((
 static aurpkg_t **dedupe_results(aurpkg_t **list);
 static aurpkg_t **download(struct task_t *task, const char*);
 static aurpkg_t **filter_results(aurpkg_t **);
+static int find_search_fragment(const char *, char **);
 static char *get_file_as_buffer(const char*);
 static int getcols(void);
 static int get_config_path(char *config_path, size_t pathlen);
@@ -202,9 +203,8 @@ static void print_results(aurpkg_t **, void (*)(aurpkg_t*));
 static int read_targets_from_file(FILE *in, alpm_list_t **targets);
 static void resolve_one_dep(struct task_t *task, const char *depend);
 static void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package);
+static rpc_type rpc_op_from_opmask(int opmask);
 static aurpkg_t **rpc_do(struct task_t *task, rpc_type type, const char *arg);
-static aurpkg_t **rpc_info(struct task_t *task, const char *arg);
-static aurpkg_t **rpc_search(struct task_t *task, const char *arg);
 static int ch_working_dir(void);
 static int should_ignore_package(const aurpkg_t *package, regex_t *pattern);
 static void strings_init(void);
@@ -257,7 +257,6 @@ static struct {
   .utd = "",
   .nc = ""
 };
-
 
 /* runtime configuration */
 static struct {
@@ -684,7 +683,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
   int ret;
   struct buffer_t response = { NULL, 0, 0 };
 
-  result = rpc_info(task, package);
+  result = rpc_do(task, RPC_INFO, package);
   if(!result) {
     cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", package);
@@ -963,11 +962,10 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files)
   alpm_list_t *i, *targets = NULL, *results = NULL;
 
   for(i = files; i; i = i->next) {
-    char *pkgbuild = get_file_as_buffer(i->data);
+    _cleanup_free_ char *pkgbuild = get_file_as_buffer(i->data);
 
     /* TODO: parse .SRCINFO instead of PKGBUILD */
     pkgbuild_get_depends(pkgbuild, &results);
-    free(pkgbuild);
   }
 
   /* sanitize and dedupe */
@@ -1963,14 +1961,9 @@ aurpkg_t **rpc_do(struct task_t *task, rpc_type type, const char *arg) {
   return packages;
 }
 
-aurpkg_t **rpc_info(struct task_t *task, const char *arg) {
-  return rpc_do(task, RPC_INFO, arg);
-}
-
-aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
+int find_search_fragment(const char *arg, char **fragment) {
   int span = 0;
   const char *argstr;
-  _cleanup_free_ char *fragment = NULL;
 
   for(argstr = arg; *argstr; argstr++) {
     span = strcspn(argstr, kRegexChars);
@@ -1985,7 +1978,7 @@ aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
       argstr = strpbrk(argstr + span, "]}");
       if(!argstr) {
         cwr_fprintf(stderr, LOG_ERROR, "invalid regular expression: %s\n", arg);
-        return NULL;
+        return -EINVAL;
       }
       continue;
     }
@@ -1997,28 +1990,37 @@ aurpkg_t **rpc_search(struct task_t *task, const char *arg) {
 
   if(span < 2) {
     cwr_fprintf(stderr, LOG_ERROR, "search string '%s' too short\n", arg);
-    return NULL;
+    return -ENOMSG;
   }
 
+  *fragment = strndup(argstr, span);
+  return 0;
+}
 
-  fragment = strndup(argstr, span);
-  if (fragment == NULL) {
-    return NULL;
+rpc_type rpc_op_from_opmask(int opmask) {
+  if (opmask & OP_SEARCH) {
+    return RPC_SEARCH;
+  } else {
+    return RPC_INFO;
   }
-
-  cwr_printf(LOG_DEBUG, "searching with fragment '%s' from '%s'\n", fragment, arg);
-
-  return rpc_do(task, RPC_SEARCH, fragment);
 }
 
 aurpkg_t **task_query(struct task_t *task, const char *arg) {
+  _cleanup_free_ char *fragment = NULL;
+
   if (allow_regex()) {
-    return rpc_search(task, arg);
-  } else if (cfg.opmask & OP_SEARCH) {
-    return rpc_do(task, RPC_SEARCH, arg);
-  } else {
-    return rpc_do(task, RPC_INFO, arg);
+    int r;
+
+    r = find_search_fragment(arg, &fragment);
+    if (r < 0) {
+      return NULL;
+    }
+
+    cwr_printf(LOG_DEBUG, "searching with fragment '%s' from '%s'\n", fragment, arg);
+    arg = fragment;
   }
+
+  return rpc_do(task, rpc_op_from_opmask(cfg.opmask), arg);
 }
 
 aurpkg_t **task_update(struct task_t *task, const char *arg) {
@@ -2028,7 +2030,7 @@ aurpkg_t **task_update(struct task_t *task, const char *arg) {
   cwr_printf(LOG_VERBOSE, "Checking %s%s%s for updates...\n",
       colstr.pkg, arg, colstr.nc);
 
-  packages = rpc_info(task, arg);
+  packages = rpc_do(task, RPC_INFO, arg);
   if (packages == NULL) {
     return NULL;
   }
