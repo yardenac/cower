@@ -9,8 +9,8 @@
 #include <curl/curl.h>
 
 struct rpc_method_t {
-  const char* type;
-  const char* argkey;
+  const char *type;
+  const char *argkey;
 };
 
 static const struct rpc_method_t method_table[] = {
@@ -33,7 +33,7 @@ static const char *search_by_to_string[] = {
 static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
   int len;
   va_list aq;
-  char *out, *p;
+  char *out;
 
   va_copy(aq, ap);
   len = strlen(aur->urlprefix) + vsnprintf(NULL, 0, urlpath_format, aq) + 1;
@@ -44,9 +44,7 @@ static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
     return NULL;
   }
 
-  p = stpcpy(out, aur->urlprefix);
-  p += vsprintf(p, urlpath_format, ap);
-  *p = '\0';
+  vsprintf(stpcpy(out, aur->urlprefix), urlpath_format, ap);
 
   return out;
 }
