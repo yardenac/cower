@@ -2009,10 +2009,7 @@ aurpkg_t **task_query(struct task_t *task, const char *arg) {
   _cleanup_free_ char *fragment = NULL;
 
   if (allow_regex()) {
-    int r;
-
-    r = find_search_fragment(arg, &fragment);
-    if (r < 0) {
+    if (find_search_fragment(arg, &fragment) < 0) {
       return NULL;
     }
 
