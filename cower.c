@@ -2244,6 +2244,11 @@ int main(int argc, char *argv[]) {
 
   setlocale(LC_ALL, "");
 
+  /* Override LC_NUMERIC with a C locale for now. This matches what the AUR
+   * responds with in the RPC interface. Once we're done gathering data, we'll
+   * reset to the user's chosen LC_NUMERIC locale. */
+  setlocale(LC_NUMERIC, "C");
+
   ret = parse_configfile();
   if (ret != 0) {
     return ret;
@@ -2325,6 +2330,8 @@ int main(int argc, char *argv[]) {
    * this is opposing behavior, so just XOR the result on a pure update */
   ret = (!have_unignored_results(results) ^ !(cfg.opmask & ~OP_UPDATE));
 
+  /* Restore the user-defined LC_NUMERIC locale before printing results. */
+  setlocale(LC_NUMERIC, "");
   print_results(results, printfn);
 
   aur_packages_free(results);
