@@ -303,19 +303,16 @@ int allow_regex() {
   return cfg.opmask & OP_SEARCH && cfg.search_by != SEARCHBY_MAINTAINER;
 }
 
-int streq(const char *s1, const char *s2)
-{
+int streq(const char *s1, const char *s2) {
   return strcmp(s1, s2) == 0;
 }
 
-int startswith(const char *s1, const char *s2)
-{
+int startswith(const char *s1, const char *s2) {
   return strncmp(s1, s2, strlen(s2)) == 0;
 }
 
 /* TODO: handle includes. maybe use pkgfile's parser as a starting point. */
-alpm_handle_t *alpm_init(void)
-{
+alpm_handle_t *alpm_init(void) {
   _cleanup_fclose_ FILE *fp = NULL;
   char line[PATH_MAX];
   char *ptr, *section = NULL;
@@ -323,32 +320,32 @@ alpm_handle_t *alpm_init(void)
 
   cwr_printf(LOG_DEBUG, "initializing alpm\n");
   pmhandle = alpm_initialize(PACMAN_ROOT, PACMAN_DBPATH, &err);
-  if(!pmhandle) {
+  if (!pmhandle) {
     fprintf(stderr, "failed to initialize alpm: %s\n", alpm_strerror(err));
     return NULL;
   }
 
   fp = fopen(PACMAN_CONFIG, "r");
-  if(!fp) {
+  if (!fp) {
     return pmhandle;
   }
 
-  while(fgets(line, PATH_MAX, fp)) {
+  while (fgets(line, PATH_MAX, fp)) {
     size_t linelen;
 
-    if((ptr = strchr(line, '#'))) {
+    if ((ptr = strchr(line, '#'))) {
       *ptr = '\0';
     }
-    if(!(linelen = strtrim(line))) {
+    if (!(linelen = strtrim(line))) {
       continue;
     }
 
-    if(line[0] == '[' && line[linelen - 1] == ']') {
+    if (line[0] == '[' && line[linelen - 1] == ']') {
       free(section);
       section = strndup(&line[1], linelen - 2);
 
-      if(!streq(section, "options")) {
-        if(!cfg.skiprepos && !alpm_list_find_str(cfg.ignore.repos, section)) {
+      if (!streq(section, "options")) {
+        if (!cfg.skiprepos && !alpm_list_find_str(cfg.ignore.repos, section)) {
           alpm_register_syncdb(pmhandle, section, 0);
           cwr_printf(LOG_DEBUG, "registering alpm db: %s\n", section);
         }
@@ -360,8 +357,8 @@ alpm_handle_t *alpm_init(void)
       strsep(&ptr, "=");
       strtrim(key);
       strtrim(ptr);
-      if(streq(key, "IgnorePkg")) {
-        for(token = strtok(ptr, "\t\n "); token; token = strtok(NULL, "\t\n ")) {
+      if (streq(key, "IgnorePkg")) {
+        for (token = strtok(ptr, "\t\n "); token; token = strtok(NULL, "\t\n ")) {
           cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
           cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
         }
@@ -379,15 +376,14 @@ alpm_handle_t *alpm_init(void)
   return pmhandle;
 }
 
-alpm_list_t *alpm_find_foreign_pkgs(void)
-{
+alpm_list_t *alpm_find_foreign_pkgs(void) {
   const alpm_list_t *i;
   alpm_list_t *ret = NULL;
 
-  for(i = alpm_db_get_pkgcache(db_local); i; i = i->next) {
+  for (i = alpm_db_get_pkgcache(db_local); i; i = i->next) {
     alpm_pkg_t *pkg = i->data;
 
-    if(alpm_pkg_is_foreign(pkg)) {
+    if (alpm_pkg_is_foreign(pkg)) {
       ret = alpm_list_add(ret, strdup(alpm_pkg_get_name(pkg)));
     }
   }
@@ -395,15 +391,14 @@ alpm_list_t *alpm_find_foreign_pkgs(void)
   return ret;
 }
 
-int alpm_pkg_is_foreign(alpm_pkg_t *pkg)
-{
+int alpm_pkg_is_foreign(alpm_pkg_t *pkg) {
   const alpm_list_t *i;
   const char *pkgname;
 
   pkgname = alpm_pkg_get_name(pkg);
 
-  for(i = alpm_get_syncdbs(pmhandle); i; i = i->next) {
-    if(alpm_db_get_pkg(i->data, pkgname)) {
+  for (i = alpm_get_syncdbs(pmhandle); i; i = i->next) {
+    if (alpm_db_get_pkg(i->data, pkgname)) {
       return 0;
     }
   }
@@ -411,16 +406,15 @@ int alpm_pkg_is_foreign(alpm_pkg_t *pkg)
   return 1;
 }
 
-const char *alpm_provides_pkg(const char *pkgname)
-{
+const char *alpm_provides_pkg(const char *pkgname) {
   const alpm_list_t *i;
   const char *dbname = NULL;
   static pthread_mutex_t alpmlock = PTHREAD_MUTEX_INITIALIZER;
 
   pthread_mutex_lock(&alpmlock);
-  for(i = alpm_get_syncdbs(pmhandle); i; i = i->next) {
+  for (i = alpm_get_syncdbs(pmhandle); i; i = i->next) {
     alpm_db_t *db = i->data;
-    if(alpm_find_satisfier(alpm_db_get_pkgcache(db), pkgname)) {
+    if (alpm_find_satisfier(alpm_db_get_pkgcache(db), pkgname)) {
       dbname = alpm_db_get_name(db);
       break;
     }
@@ -430,8 +424,7 @@ const char *alpm_provides_pkg(const char *pkgname)
   return dbname;
 }
 
-int archive_extract_file(char *data, size_t size)
-{
+int archive_extract_file(char *data, size_t size) {
   struct archive *archive;
   struct archive_entry *entry;
   const int archive_flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME;
@@ -441,18 +434,18 @@ int archive_extract_file(char *data, size_t size)
   archive_read_support_filter_all(archive);
   archive_read_support_format_all(archive);
 
-  if(archive_read_open_memory(archive, data, size) != ARCHIVE_OK) {
+  if (archive_read_open_memory(archive, data, size) != ARCHIVE_OK) {
     return archive_errno(archive);
   }
 
-  while(archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
+  while (archive_read_next_header(archive, &entry) == ARCHIVE_OK) {
     const char *entryname = archive_entry_pathname(entry);
 
     cwr_printf(LOG_DEBUG, "extracting file: %s\n", entryname);
 
     r = archive_read_extract(archive, entry, archive_flags);
     /* NOOP ON ARCHIVE_{OK,WARN,RETRY} */
-    if(r == ARCHIVE_FATAL || r == ARCHIVE_WARN) {
+    if (r == ARCHIVE_FATAL || r == ARCHIVE_WARN) {
       r = archive_errno(archive);
       break;
     } else if (r == ARCHIVE_EOF) {
@@ -467,8 +460,7 @@ int archive_extract_file(char *data, size_t size)
   return r;
 }
 
-int aurpkg_cmp(const void *a, const void *b)
-{
+int aurpkg_cmp(const void *a, const void *b) {
   const aurpkg_t * const *pkg1 = a;
   const aurpkg_t * const *pkg2 = b;
 
@@ -494,9 +486,9 @@ int aurpkg_cmpvotes(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
 int aurpkg_cmppopularity(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
   const double diff = pkg1->popularity - pkg2->popularity;
 
-  if(diff > DBL_EPSILON) {
+  if (diff > DBL_EPSILON) {
     return 1;
-  } else if(diff < -DBL_EPSILON) {
+  } else if (diff < -DBL_EPSILON) {
     return -1;
   } else {
     return 0;
@@ -515,8 +507,7 @@ int aurpkg_cmpfirstsub(const aurpkg_t *pkg1, const aurpkg_t *pkg2) {
   return difftime(pkg1->submitted_s, pkg2->submitted_s);
 }
 
-int globcompare(const void *a, const void *b)
-{
+int globcompare(const void *a, const void *b) {
   return fnmatch(a, b, 0);
 }
 
@@ -536,8 +527,7 @@ int have_unignored_results(aurpkg_t **packages) {
   return 0;
 }
 
-int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...)
-{
+int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...) {
   int ret;
   va_list args;
 
@@ -548,8 +538,7 @@ int cwr_fprintf(FILE *stream, loglevel_t level, const char *format, ...)
   return ret;
 }
 
-int cwr_printf(loglevel_t level, const char *format, ...)
-{
+int cwr_printf(loglevel_t level, const char *format, ...) {
   int ret;
   va_list args;
 
@@ -560,12 +549,11 @@ int cwr_printf(loglevel_t level, const char *format, ...)
   return ret;
 }
 
-int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list args)
-{
+int cwr_vfprintf(FILE *stream, loglevel_t level, const char *format, va_list args) {
   const char *prefix;
   char bufout[128];
 
-  if(!(cfg.logmask & level)) {
+  if (!(cfg.logmask & level)) {
     return 0;
   }
 
@@ -676,15 +664,14 @@ int task_http_execute(struct task_t *task, const char *url, const char *arg) {
   return 0;
 }
 
-aurpkg_t **download(struct task_t *task, const char *package)
-{
+aurpkg_t **download(struct task_t *task, const char *package) {
   aurpkg_t **result;
   _cleanup_free_ char *url = NULL;
   int ret;
   struct buffer_t response = { NULL, 0, 0 };
 
   result = rpc_do(task, RPC_INFO, package);
-  if(!result) {
+  if (!result) {
     cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", package);
     return NULL;
@@ -692,7 +679,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
 
   cwr_printf(LOG_DEBUG, "package %s is part of pkgbase %s\n", package, result[0]->pkgbase);
 
-  if(access(result[0]->pkgbase, F_OK) == 0 && !cfg.force) {
+  if (access(result[0]->pkgbase, F_OK) == 0 && !cfg.force) {
     cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
         cfg.working_dir, result[0]->pkgbase);
@@ -711,7 +698,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
   }
 
   ret = archive_extract_file(response.data, response.size);
-  if(ret != 0) {
+  if (ret != 0) {
     cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
         package, strerror(ret));
@@ -722,7 +709,7 @@ aurpkg_t **download(struct task_t *task, const char *package)
   cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
       colstr.pkg, result[0]->name, colstr.nc, cfg.working_dir);
 
-  if(cfg.getdeps) {
+  if (cfg.getdeps) {
     resolve_pkg_dependencies(task, result[0]);
   }
 
@@ -808,38 +795,36 @@ aurpkg_t **filter_results(aurpkg_t **packages) {
   return packages;
 }
 
-int getcols(void)
-{
+int getcols(void) {
   int termwidth = -1;
   const int default_tty = 80;
   const int default_notty = 0;
 
-  if(!isatty(fileno(stdout))) {
+  if (!isatty(fileno(stdout))) {
     return default_notty;
   }
 
 #ifdef TIOCGSIZE
   struct ttysize win;
-  if(ioctl(1, TIOCGSIZE, &win) == 0) {
+  if (ioctl(1, TIOCGSIZE, &win) == 0) {
     termwidth = win.ts_cols;
   }
 #elif defined(TIOCGWINSZ)
   struct winsize win;
-  if(ioctl(1, TIOCGWINSZ, &win) == 0) {
+  if (ioctl(1, TIOCGWINSZ, &win) == 0) {
     termwidth = win.ws_col;
   }
 #endif
   return termwidth <= 0 ? default_tty : termwidth;
 }
 
-char *get_file_as_buffer(const char *path)
-{
+char *get_file_as_buffer(const char *path) {
   _cleanup_fclose_ FILE *fp = NULL;
   char *buf;
   long fsize, nread;
 
   fp = fopen(path, "r");
-  if(!fp) {
+  if (!fp) {
     cwr_fprintf(stderr, LOG_ERROR, "error: failed to open %s: %s\n",
         path, strerror(errno));
     return NULL;
@@ -853,7 +838,7 @@ char *get_file_as_buffer(const char *path)
 
   nread = fread(buf, 1, fsize, fp);
 
-  if(nread < fsize) {
+  if (nread < fsize) {
     cwr_fprintf(stderr, LOG_ERROR, "Failed to read full PKGBUILD\n");
     free(buf);
     return NULL;
@@ -862,25 +847,24 @@ char *get_file_as_buffer(const char *path)
   return buf;
 }
 
-int get_config_path(char *config_path, size_t pathlen)
-{
+int get_config_path(char *config_path, size_t pathlen) {
   char *var;
   struct passwd *pwd;
 
   var = getenv("XDG_CONFIG_HOME");
-  if(var != NULL) {
+  if (var != NULL) {
     snprintf(config_path, pathlen, "%s/cower/config", var);
     return 0;
   }
 
   var = getenv("HOME");
-  if(var != NULL) {
+  if (var != NULL) {
     snprintf(config_path, pathlen, "%s/.config/cower/config", var);
     return 0;
   }
 
   pwd = getpwuid(getuid());
-  if(pwd != NULL && pwd->pw_dir != NULL) {
+  if (pwd != NULL && pwd->pw_dir != NULL) {
     snprintf(config_path, pathlen, "%s/.config/cower/config", pwd->pw_dir);
     return 0;
   }
@@ -888,20 +872,19 @@ int get_config_path(char *config_path, size_t pathlen)
   return 1;
 }
 
-void indentprint(const char *str, int indent)
-{
+void indentprint(const char *str, int indent) {
   wchar_t *wcstr;
   const wchar_t *p;
   int len, cidx, cols;
 
-  if(!str) {
+  if (!str) {
     return;
   }
 
   cols = getcols();
 
   /* if we're not a tty, print without indenting */
-  if(cols == 0) {
+  if (cols == 0) {
     fputs(str, stdout);
     return;
   }
@@ -912,19 +895,19 @@ void indentprint(const char *str, int indent)
   p = wcstr;
   cidx = indent;
 
-  if(!p || !len) {
+  if (!p || !len) {
     return;
   }
 
-  while(*p) {
-    if(*p == L' ') {
+  while (*p) {
+    if (*p == L' ') {
       const wchar_t *q, *next;
       p++;
-      if(!p || *p == L' ') {
+      if (!p || *p == L' ') {
         continue;
       }
       next = wcschr(p, L' ');
-      if(!next) {
+      if (!next) {
         next = p + wcslen(p);
       }
 
@@ -932,11 +915,11 @@ void indentprint(const char *str, int indent)
       len = 0;
       q = p;
 
-      while(q < next) {
+      while (q < next) {
         len += wcwidth(*q++);
       }
 
-      if(len > (cols - cidx - 1)) {
+      if (len > (cols - cidx - 1)) {
         /* wrap to a newline and reindent */
         printf("\n%-*s", indent, "");
         cidx = indent;
@@ -957,11 +940,10 @@ void indentprint(const char *str, int indent)
   free(wcstr);
 }
 
-alpm_list_t *load_targets_from_files(alpm_list_t *files)
-{
+alpm_list_t *load_targets_from_files(alpm_list_t *files) {
   alpm_list_t *i, *targets = NULL, *results = NULL;
 
-  for(i = files; i; i = i->next) {
+  for (i = files; i; i = i->next) {
     _cleanup_free_ char *pkgbuild = get_file_as_buffer(i->data);
 
     /* TODO: parse .SRCINFO instead of PKGBUILD */
@@ -969,11 +951,11 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files)
   }
 
   /* sanitize and dedupe */
-  for(i = results; i; i = i->next) {
+  for (i = results; i; i = i->next) {
     char *sanitized = strdup(i->data);
 
     sanitized[strcspn(sanitized, "<>=")] = '\0';
-    if(!alpm_list_find_str(targets, sanitized)) {
+    if (!alpm_list_find_str(targets, sanitized)) {
       targets = alpm_list_add(targets, sanitized);
     }
   }
@@ -981,25 +963,23 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files)
   return targets;
 }
 
-void openssl_crypto_cleanup(void)
-{
+void openssl_crypto_cleanup(void) {
   int i;
 
   CRYPTO_set_locking_callback(NULL);
 
-  for(i = 0; i < CRYPTO_num_locks(); i++) {
+  for (i = 0; i < CRYPTO_num_locks(); i++) {
     pthread_mutex_destroy(&openssl_lock[i]);
   }
 
   OPENSSL_free(openssl_lock);
 }
 
-void openssl_crypto_init(void)
-{
+void openssl_crypto_init(void) {
   int i;
 
   openssl_lock = OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
-  for(i = 0; i < CRYPTO_num_locks(); i++) {
+  for (i = 0; i < CRYPTO_num_locks(); i++) {
     pthread_mutex_init(&openssl_lock[i], NULL);
   }
 
@@ -1008,52 +988,49 @@ void openssl_crypto_init(void)
 }
 
 void openssl_thread_cb(int mode, int type, const char UNUSED *file,
-    int UNUSED line)
-{
-  if(mode & CRYPTO_LOCK) {
+    int UNUSED line) {
+  if (mode & CRYPTO_LOCK) {
     pthread_mutex_lock(&openssl_lock[type]);
   } else {
     pthread_mutex_unlock(&openssl_lock[type]);
   }
 }
 
-void openssl_thread_id(CRYPTO_THREADID *id)
-{
+void openssl_thread_id(CRYPTO_THREADID *id) {
   CRYPTO_THREADID_set_numeric(id, pthread_self());
 }
 
-alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array)
-{
+alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array) {
   char *ptr, *token, *saveptr;
 
-  if(!array) {
+  if (!array) {
     return NULL;
   }
 
-  for(token = strtok_r(array, " \t\n", &saveptr); token;
+  for (token = strtok_r(array, " \t\n", &saveptr); token;
       token = strtok_r(NULL, " \t\n", &saveptr)) {
     /* found an embedded comment. skip to the next line */
-    if(*token == '#') {
+    if (*token == '#') {
       strtok_r(NULL, "\n", &saveptr);
       continue;
     }
 
     /* unquote the element */
-    if(*token == '\'' || *token == '\"') {
+    if (*token == '\'' || *token == '\"') {
       ptr = strrchr(token + 1, *token);
-      if(ptr) {
+      if (ptr) {
         token++;
         *ptr = '\0';
       }
     }
 
     /* some people feel compelled to do insane things in PKGBUILDs. these people suck */
-    if(!*token || strlen(token) < 2 || *token == '$') {
+    if (!*token || strlen(token) < 2 || *token == '$') {
       continue;
     }
 
     cwr_printf(LOG_DEBUG, "adding depend: %s\n", token);
-    if(!alpm_list_find_str(deplist, token)) {
+    if (!alpm_list_find_str(deplist, token)) {
       deplist = alpm_list_add(deplist, strdup(token));
     }
   }
@@ -1061,32 +1038,31 @@ alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array)
   return deplist;
 }
 
-int parse_configfile(void)
-{
+int parse_configfile(void) {
   char line[BUFSIZ], config_path[PATH_MAX];
   int r = 0;
   _cleanup_fclose_ FILE *fp = NULL;
 
-  if(get_config_path(config_path, sizeof(config_path)) != 0) {
+  if (get_config_path(config_path, sizeof(config_path)) != 0) {
     return 0;
   }
 
   fp = fopen(config_path, "r");
-  if(!fp) {
+  if (!fp) {
     cwr_printf(LOG_DEBUG, "config file not found. skipping parsing\n");
     return 0; /* not an error, just nothing to do here */
   }
 
-  while(fgets(line, sizeof(line), fp)) {
+  while (fgets(line, sizeof(line), fp)) {
     char *key, *val;
     size_t linelen;
 
     linelen = strtrim(line);
-    if(!linelen || line[0] == '#') {
+    if (!linelen || line[0] == '#') {
       continue;
     }
 
-    if((val = strchr(line, '#'))) {
+    if ((val = strchr(line, '#'))) {
       *val = '\0';
     }
 
@@ -1095,7 +1071,7 @@ int parse_configfile(void)
     strtrim(key);
     strtrim(val);
 
-    if(val && !*val) {
+    if (val && !*val) {
       val = NULL;
     }
 
@@ -1103,28 +1079,28 @@ int parse_configfile(void)
 
     /* colors are not initialized in this section, so usage of cwr_printf
      * functions is verboten unless we're using loglevel_t LOG_DEBUG */
-    if(streq(key, "IgnoreRepo")) {
-      for(key = strtok(val, " "); key; key = strtok(NULL, " ")) {
+    if (streq(key, "IgnoreRepo")) {
+      for (key = strtok(val, " "); key; key = strtok(NULL, " ")) {
         cwr_printf(LOG_DEBUG, "ignoring repo: %s\n", key);
         cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(key));
       }
-    } else if(streq(key, "IgnorePkg")) {
-      for(key = strtok(val, " "); key; key = strtok(NULL, " ")) {
+    } else if (streq(key, "IgnorePkg")) {
+      for (key = strtok(val, " "); key; key = strtok(NULL, " ")) {
         cwr_printf(LOG_DEBUG, "ignoring package: %s\n", key);
         cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(key));
       }
-    } else if(streq(key, "IgnoreOOD")) {
+    } else if (streq(key, "IgnoreOOD")) {
       cfg.ignoreood = 1;
-    } else if(streq(key, "TargetDir")) {
-      if(val) {
+    } else if (streq(key, "TargetDir")) {
+      if (val) {
         wordexp_t p;
-        if(wordexp(val, &p, 0) == 0) {
-          if(p.we_wordc == 1) {
+        if (wordexp(val, &p, 0) == 0) {
+          if (p.we_wordc == 1) {
             cfg.working_dir = strdup(p.we_wordv[0]);
           }
           wordfree(&p);
           /* error on relative paths */
-          if(*cfg.working_dir != '/') {
+          if (*cfg.working_dir != '/') {
             fprintf(stderr, "error: TargetDir cannot be a relative path\n");
             r = 1;
           }
@@ -1133,28 +1109,28 @@ int parse_configfile(void)
           r = 1;
         }
       }
-    } else if(streq(key, "MaxThreads")) {
-      if(val) {
+    } else if (streq(key, "MaxThreads")) {
+      if (val) {
         cfg.maxthreads = strtol(val, &key, 10);
-        if(*key != '\0' || cfg.maxthreads <= 0) {
+        if (*key != '\0' || cfg.maxthreads <= 0) {
           fprintf(stderr, "error: invalid option to MaxThreads: %s\n", val);
           r = 1;
         }
       }
-    } else if(streq(key, "ConnectTimeout")) {
-      if(val) {
+    } else if (streq(key, "ConnectTimeout")) {
+      if (val) {
         cfg.timeout = strtol(val, &key, 10);
-        if(*key != '\0' || cfg.timeout < 0) {
+        if (*key != '\0' || cfg.timeout < 0) {
           fprintf(stderr, "error: invalid option to ConnectTimeout: %s\n", val);
           r = 1;
         }
       }
-    } else if(streq(key, "Color")) {
-      if(!val || streq(val, "auto")) {
+    } else if (streq(key, "Color")) {
+      if (!val || streq(val, "auto")) {
         cfg.color = isatty(fileno(stdout));
-      } else if(streq(val, "always")) {
+      } else if (streq(val, "always")) {
         cfg.color = 1;
-      } else if(streq(val, "never")) {
+      } else if (streq(val, "never")) {
         cfg.color = 0;
       } else {
         fprintf(stderr, "error: invalid option to Color: %s\n", val);
@@ -1168,8 +1144,7 @@ int parse_configfile(void)
   return r;
 }
 
-int parse_options(int argc, char *argv[])
-{
+int parse_options(int argc, char *argv[]) {
   int opt, option_index = 0;
 
   static const struct option opts[] = {
@@ -1206,7 +1181,7 @@ int parse_options(int argc, char *argv[])
     {0, 0, 0, 0}
   };
 
-  while((opt = getopt_long(argc, argv, "bc::dfhimopqst:uvV", opts, &option_index)) != -1) {
+  while ((opt = getopt_long(argc, argv, "bc::dfhimopqst:uvV", opts, &option_index)) != -1) {
     char *token;
 
     switch(opt) {
@@ -1221,7 +1196,7 @@ int parse_options(int argc, char *argv[])
         cfg.opmask |= OP_INFO;
         break;
       case 'd':
-        if(!(cfg.opmask & OP_DOWNLOAD)) {
+        if (!(cfg.opmask & OP_DOWNLOAD)) {
           cfg.opmask |= OP_DOWNLOAD;
         } else {
           cfg.getdeps |= 1;
@@ -1237,15 +1212,15 @@ int parse_options(int argc, char *argv[])
         cfg.logmask |= LOG_BRIEF;
         break;
       case 'c':
-        if(!optarg || streq(optarg, "auto")) {
-          if(isatty(fileno(stdout))) {
+        if (!optarg || streq(optarg, "auto")) {
+          if (isatty(fileno(stdout))) {
             cfg.color = 1;
           } else {
             cfg.color = 0;
           }
-        } else if(streq(optarg, "always")) {
+        } else if (streq(optarg, "always")) {
           cfg.color = 1;
-        } else if(streq(optarg, "never")) {
+        } else if (streq(optarg, "never")) {
           cfg.color = 0;
         } else {
           fprintf(stderr, "invalid argument to --color\n");
@@ -1279,7 +1254,7 @@ int parse_options(int argc, char *argv[])
       case OP_RSORT:
         cfg.sortorder = SORT_REVERSE;
       case OP_SORT:
-        if(parse_keyname(optarg)) {
+        if (parse_keyname(optarg)) {
           fprintf(stderr, "error: invalid argument to --%s\n", opts[option_index].name);
           return 1;
         }
@@ -1291,16 +1266,16 @@ int parse_options(int argc, char *argv[])
         cfg.frompkgbuild |= 1;
         break;
       case OP_IGNOREPKG:
-        for(token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
+        for (token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
           cwr_printf(LOG_DEBUG, "ignoring package: %s\n", token);
           cfg.ignore.pkgs = alpm_list_add(cfg.ignore.pkgs, strdup(token));
         }
         break;
       case OP_IGNOREREPO:
-        if(!optarg) {
+        if (!optarg) {
           cfg.skiprepos |= 1;
         } else {
-          for(token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
+          for (token = strtok(optarg, ","); token; token = strtok(NULL, ",")) {
             cwr_printf(LOG_DEBUG, "ignoring repos: %s\n", token);
             cfg.ignore.repos = alpm_list_add(cfg.ignore.repos, strdup(token));
           }
@@ -1317,14 +1292,14 @@ int parse_options(int argc, char *argv[])
         break;
       case OP_THREADS:
         cfg.maxthreads = strtol(optarg, &token, 10);
-        if(*token != '\0' || cfg.maxthreads <= 0) {
+        if (*token != '\0' || cfg.maxthreads <= 0) {
           fprintf(stderr, "error: invalid argument to --threads: %s\n", optarg);
           return 1;
         }
         break;
       case OP_TIMEOUT:
         cfg.timeout = strtol(optarg, &token, 10);
-        if(*token != '\0' || cfg.timeout < 0) {
+        if (*token != '\0' || cfg.timeout < 0) {
           fprintf(stderr, "error: invalid argument to --timeout: %s\n", optarg);
           return 1;
         }
@@ -1346,14 +1321,14 @@ int parse_options(int argc, char *argv[])
     }
   }
 
-  if(!cfg.opmask) {
+  if (!cfg.opmask) {
     fprintf(stderr, "error: no operation specified (use -h for help)\n");
     return 3;
   }
 
 #define NOT_EXCL(val) (cfg.opmask & (val) && (cfg.opmask & ~(val)))
   /* check for invalid operation combos */
-  if(NOT_EXCL(OP_INFO) || NOT_EXCL(OP_SEARCH) ||
+  if (NOT_EXCL(OP_INFO) || NOT_EXCL(OP_SEARCH) ||
       NOT_EXCL(OP_UPDATE|OP_DOWNLOAD)) {
     fprintf(stderr, "error: invalid operation\n");
     return 1;
@@ -1379,8 +1354,8 @@ int parse_options(int argc, char *argv[])
     }
   }
 
-  while(optind < argc) {
-    if(!alpm_list_find_str(cfg.targets, argv[optind])) {
+  while (optind < argc) {
+    if (!alpm_list_find_str(cfg.targets, argv[optind])) {
       cwr_printf(LOG_DEBUG, "adding target: %s\n", argv[optind]);
       cfg.targets = alpm_list_add(cfg.targets, strdup(argv[optind]));
     }
@@ -1392,41 +1367,39 @@ int parse_options(int argc, char *argv[])
   return ch_working_dir();
 }
 
-int parse_keyname(char* keyname)
-{
-  if(streq("name", keyname)) {
+int parse_keyname(char* keyname) {
+  if (streq("name", keyname)) {
     cfg.sort_fn = aurpkg_cmpname;
     return 0;
-  } else if(streq("version", keyname)) {
+  } else if (streq("version", keyname)) {
     cfg.sort_fn = aurpkg_cmpver;
     return 0;
-  } else if(streq("maintainer", keyname)) {
+  } else if (streq("maintainer", keyname)) {
     cfg.sort_fn = aurpkg_cmpmaint;
     return 0;
-  } else if(streq("votes", keyname)) {
+  } else if (streq("votes", keyname)) {
     cfg.sort_fn = aurpkg_cmpvotes;
     return 0;
-  } else if(streq("popularity", keyname)) {
+  } else if (streq("popularity", keyname)) {
     cfg.sort_fn = aurpkg_cmppopularity;
     return 0;
-  } else if(streq("outofdate", keyname)) {
+  } else if (streq("outofdate", keyname)) {
     cfg.sort_fn = aurpkg_cmpood;
     return 0;
-  } else if(streq("lastmodified", keyname)) {
+  } else if (streq("lastmodified", keyname)) {
     cfg.sort_fn = aurpkg_cmplastmod;
     return 0;
-  } else if(streq("firstsubmitted", keyname)) {
+  } else if (streq("firstsubmitted", keyname)) {
     cfg.sort_fn = aurpkg_cmpfirstsub;
     return 0;
   }
   return 1;
 }
 
-int pkg_is_binary(const char *pkg)
-{
+int pkg_is_binary(const char *pkg) {
   const char *db = alpm_provides_pkg(pkg);
 
-  if(db) {
+  if (db) {
     cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", pkg);
     cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s "
         "(ignore this with --ignorerepo=%s)\n",
@@ -1439,28 +1412,27 @@ int pkg_is_binary(const char *pkg)
   return 0;
 }
 
-void pkgbuild_get_depends(char *pkgbuild, alpm_list_t **deplist)
-{
+void pkgbuild_get_depends(char *pkgbuild, alpm_list_t **deplist) {
   char *lineptr;
 
-  for(lineptr = pkgbuild; lineptr; lineptr = strchr(lineptr, '\n')) {
+  for (lineptr = pkgbuild; lineptr; lineptr = strchr(lineptr, '\n')) {
     char *arrayend, *arrayptr;
     int depth = 1;
     size_t linelen;
 
     linelen = strtrim(++lineptr);
-    if(!linelen || *lineptr == '#') {
+    if (!linelen || *lineptr == '#') {
       continue;
     }
 
-    if(!startswith(lineptr, "depends=(") &&
+    if (!startswith(lineptr, "depends=(") &&
       !startswith(lineptr, "checkdepends=(") &&
       !startswith(lineptr, "makedepends=(")) {
       continue;
     }
 
     arrayptr = (char*)memchr(lineptr, '(', linelen) + 1;
-    for(arrayend = arrayptr; depth; arrayend++) {
+    for (arrayend = arrayptr; depth; arrayend++) {
       switch(*arrayend) {
         case ')':
           depth--;
@@ -1476,13 +1448,12 @@ void pkgbuild_get_depends(char *pkgbuild, alpm_list_t **deplist)
   }
 }
 
-int print_escaped(const char *delim)
-{
+int print_escaped(const char *delim) {
   const char *f;
   int out = 0;
 
-  for(f = delim; *f != '\0'; f++) {
-    if(*f == '\\') {
+  for (f = delim; *f != '\0'; f++) {
+    if (*f == '\\') {
       switch(*++f) {
         case '\\':
           fputc('\\', stdout);
@@ -1534,41 +1505,39 @@ void print_time(const char *fieldname, time_t *timestamp) {
   printf("%-*s: %s\n", kInfoIndent - 2, fieldname, str);
 }
 
-void print_extinfo_list(char **list, const char *fieldname, const char *delim, int wrap)
-{
+void print_extinfo_list(char **list, const char *fieldname, const char *delim, int wrap) {
   char **i, **next;
   size_t cols, count = 0;
 
-  if(!list) {
+  if (!list) {
     return;
   }
 
   cols = wrap ? getcols() : 0;
 
-  if(fieldname) {
+  if (fieldname) {
     count += printf("%-*s: ", kInfoIndent - 2, fieldname);
   }
 
-  for(i = list; *i; i = next) {
+  for (i = list; *i; i = next) {
     size_t data_len = strlen(*i);
     next = i + 1;
-    if(wrap && cols > 0 && count + data_len >= cols) {
+    if (wrap && cols > 0 && count + data_len >= cols) {
       printf("%-*c", kInfoIndent + 1, '\n');
       count = kInfoIndent;
     }
     count += data_len;
     fputs(*i, stdout);
-    if(next) {
+    if (next) {
       count += print_escaped(delim);
     }
   }
-  if(wrap) {
+  if (wrap) {
     fputc('\n', stdout);
   }
 }
 
-void print_pkg_formatted(aurpkg_t *pkg)
-{
+void print_pkg_formatted(aurpkg_t *pkg) {
   const char *p;
   char fmt[32], buf[64];
   int len;
@@ -1577,9 +1546,9 @@ void print_pkg_formatted(aurpkg_t *pkg)
     return;
   }
 
-  for(p = cfg.format; *p; p++) {
+  for (p = cfg.format; *p; p++) {
     len = 0;
-    if(*p == '%') {
+    if (*p == '%') {
       len = strspn(p + 1 + len, kPrintfFlags);
       len += strspn(p + 1 + len, kDigits);
       snprintf(fmt, len + 3, "%ss", p);
@@ -1667,7 +1636,7 @@ void print_pkg_formatted(aurpkg_t *pkg)
           fputc('?', stdout);
           break;
       }
-    } else if(*p == '\\') {
+    } else if (*p == '\\') {
       char ebuf[3];
       ebuf[0] = *p;
       ebuf[1] = *++p;
@@ -1702,8 +1671,7 @@ void print_pkg_installed_tag(aurpkg_t *pkg) {
   }
 }
 
-void print_pkg_info(aurpkg_t *pkg)
-{
+void print_pkg_info(aurpkg_t *pkg) {
   if (pkg->ignored) {
     return;
   }
@@ -1713,7 +1681,7 @@ void print_pkg_info(aurpkg_t *pkg)
   print_pkg_installed_tag(pkg);
   fputc('\n', stdout);
 
-  if(!streq(pkg->name, pkg->pkgbase)) {
+  if (!streq(pkg->name, pkg->pkgbase)) {
     print_colored("PackageBase", colstr.pkg, pkg->pkgbase);
   }
 
@@ -1731,7 +1699,7 @@ void print_pkg_info(aurpkg_t *pkg)
   print_extinfo_list(pkg->provides, "Provides", kListDelim, 1);
   print_extinfo_list(pkg->conflicts, "Conflicts With", kListDelim, 1);
 
-  if(pkg->optdepends) {
+  if (pkg->optdepends) {
     char **i = pkg->optdepends;
     printf("Optional Deps  : %s\n", *i);
     while (*++i) {
@@ -1759,13 +1727,12 @@ void print_pkg_info(aurpkg_t *pkg)
   fputs("\n\n", stdout);
 }
 
-void print_pkg_search(aurpkg_t *pkg)
-{
+void print_pkg_search(aurpkg_t *pkg) {
   if (pkg->ignored) {
     return;
   }
 
-  if(cfg.quiet) {
+  if (cfg.quiet) {
     printf("%s%s%s\n", colstr.pkg, pkg->name, colstr.nc);
   } else {
     printf("%saur/%s%s%s %s%s%s%s (%d, %.2f)", colstr.repo, colstr.nc, colstr.pkg,
@@ -1778,11 +1745,10 @@ void print_pkg_search(aurpkg_t *pkg)
   }
 }
 
-void print_results(aurpkg_t **packages, void (*printfn)(aurpkg_t*))
-{
+void print_results(aurpkg_t **packages, void (*printfn)(aurpkg_t*)) {
   aurpkg_t **r;
 
-  if(!printfn) {
+  if (!printfn) {
     return;
   }
 
@@ -1851,8 +1817,7 @@ void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
   }
 }
 
-int ch_working_dir(void)
-{
+int ch_working_dir(void) {
   if (!(cfg.opmask & OP_DOWNLOAD)) {
     return 0;
   }
@@ -1875,9 +1840,8 @@ int ch_working_dir(void)
   return 0;
 }
 
-void strings_init(void)
-{
-  if(cfg.color > 0) {
+void strings_init(void) {
+  if (cfg.color > 0) {
     colstr.error = BOLDRED "::" NC;
     colstr.warn = BOLDYELLOW "::" NC;
     colstr.info = BOLDBLUE "::" NC;
@@ -1894,27 +1858,26 @@ void strings_init(void)
   cfg.delim = cfg.format ? cfg.delim : kListDelim;
 }
 
-size_t strtrim(char *str)
-{
+size_t strtrim(char *str) {
   char *left = str, *right;
 
-  if(!str || *str == '\0') {
+  if (!str || *str == '\0') {
     return 0;
   }
 
-  while(isspace((unsigned char)*left)) {
+  while (isspace((unsigned char)*left)) {
     left++;
   }
-  if(left != str) {
+  if (left != str) {
     memmove(str, left, (strlen(left) + 1));
   }
 
-  if(*str == '\0') {
+  if (*str == '\0') {
     return 0;
   }
 
   right = (char*)rawmemchr(str, '\0') - 1;
-  while(isspace((unsigned char)*right)) {
+  while (isspace((unsigned char)*right)) {
     right--;
   }
   *++right = '\0';
@@ -1922,9 +1885,8 @@ size_t strtrim(char *str)
   return right - left;
 }
 
-aurpkg_t **task_download(struct task_t *task, const char *arg)
-{
-  if(pkg_is_binary(arg)) {
+aurpkg_t **task_download(struct task_t *task, const char *arg) {
+  if (pkg_is_binary(arg)) {
     return NULL;
   } else {
     return download(task, arg);
@@ -1965,30 +1927,30 @@ int find_search_fragment(const char *arg, char **fragment) {
   int span = 0;
   const char *argstr;
 
-  for(argstr = arg; *argstr; argstr++) {
+  for (argstr = arg; *argstr; argstr++) {
     span = strcspn(argstr, kRegexChars);
 
     /* given 'cow?', we can't include w in the search */
-    if(argstr[span] == '?' || argstr[span] == '*') {
+    if (argstr[span] == '?' || argstr[span] == '*') {
       span--;
     }
 
     /* a string inside [] or {} cannot be a valid span */
-    if(strchr("[{", *argstr)) {
+    if (strchr("[{", *argstr)) {
       argstr = strpbrk(argstr + span, "]}");
-      if(!argstr) {
+      if (!argstr) {
         cwr_fprintf(stderr, LOG_ERROR, "invalid regular expression: %s\n", arg);
         return -EINVAL;
       }
       continue;
     }
 
-    if(span >= 2) {
+    if (span >= 2) {
       break;
     }
   }
 
-  if(span < 2) {
+  if (span < 2) {
     cwr_fprintf(stderr, LOG_ERROR, "search string '%s' too short\n", arg);
     return -ENOMSG;
   }
@@ -2033,14 +1995,14 @@ aurpkg_t **task_update(struct task_t *task, const char *arg) {
   }
 
   pmpkg = alpm_db_get_pkg(db_local, arg);
-  if(!pmpkg) {
+  if (!pmpkg) {
     cwr_fprintf(stderr, LOG_WARN, "skipping uninstalled package %s\n", arg);
     goto finish;
   }
 
-  if(alpm_pkg_vercmp(packages[0]->version, alpm_pkg_get_version(pmpkg)) > 0) {
-    if(alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
-      if(!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
+  if (alpm_pkg_vercmp(packages[0]->version, alpm_pkg_get_version(pmpkg)) > 0) {
+    if (alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
+      if (!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
         cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
             colstr.pkg, arg, colstr.nc,
             colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
@@ -2049,10 +2011,10 @@ aurpkg_t **task_update(struct task_t *task, const char *arg) {
       goto finish;
     }
 
-    if(cfg.opmask & OP_DOWNLOAD) {
+    if (cfg.opmask & OP_DOWNLOAD) {
       aur_packages_free(task_download(task, packages[0]->name));
     } else {
-      if(cfg.quiet) {
+      if (cfg.quiet) {
         printf("%s%s%s\n", colstr.pkg, arg, colstr.nc);
       } else {
         cwr_printf(LOG_INFO, "%s%s %s%s%s -> %s%s%s\n",
@@ -2075,23 +2037,23 @@ void *thread_pool(void *arg) {
   struct task_t task = *(struct task_t *)arg;
 
   task.curl = curl_easy_init();
-  if(!task.curl) {
+  if (!task.curl) {
     cwr_fprintf(stderr, LOG_ERROR, "curl: failed to initialize handle\n");
     return NULL;
   }
 
-  while(1) {
+  while (1) {
     char *job = NULL;
     aurpkg_t **ret;
 
     pthread_mutex_lock(&listlock);
-    if(workq) {
+    if (workq) {
       job = workq->data;
       workq = workq->next;
     }
     pthread_mutex_unlock(&listlock);
 
-    if(!job) {
+    if (!job) {
       break;
     }
 
@@ -2112,8 +2074,7 @@ void *thread_pool(void *arg) {
   return packages;
 }
 
-void usage(void)
-{
+void usage(void) {
   fprintf(stderr, "cower %s\n"
       "Usage: cower <operations> [options] target...\n\n", COWER_VERSION);
   fprintf(stderr,
@@ -2150,8 +2111,7 @@ void usage(void)
       "  -v, --verbose             output more\n\n");
 }
 
-void version(void)
-{
+void version(void) {
   fputs("\n  " COWER_VERSION "\n", stdout);
   fputs("     \\\n"
         "      \\\n"
@@ -2167,18 +2127,18 @@ void version(void)
 int read_targets_from_file(FILE *in, alpm_list_t **targets) {
   char line[BUFSIZ];
   int i = 0, c = 0, end = 0;
-  while(!end) {
+  while (!end) {
     c = fgetc(in);
 
-    if(c == EOF) {
+    if (c == EOF) {
       end = 1;
     }
 
-    if(end || isspace(c)) {
+    if (end || isspace(c)) {
       line[i] = '\0';
       /* avoid adding zero length arg, if multiple spaces separate args */
-      if(i > 0) {
-        if(!alpm_list_find_str(*targets, line)) {
+      if (i > 0) {
+        if (!alpm_list_find_str(*targets, line)) {
           cwr_printf(LOG_DEBUG, "adding target: %s\n", line);
           *targets = alpm_list_add(*targets, strdup(line));
         }
@@ -2187,7 +2147,7 @@ int read_targets_from_file(FILE *in, alpm_list_t **targets) {
     } else {
       line[i] = c;
       ++i;
-      if(i >= BUFSIZ) {
+      if (i >= BUFSIZ) {
         cwr_fprintf(stderr, LOG_ERROR, "buffer overflow detected in stdin\n");
         return -1;
       }
@@ -2211,7 +2171,7 @@ aurpkg_t **cower_perform(struct task_t *task, int num_threads) {
     int r;
 
     r = pthread_create(&threads[i], NULL, thread_pool, task);
-    if(r != 0) {
+    if (r != 0) {
       cwr_fprintf(stderr, LOG_ERROR, "failed to spawn new thread: %s\n",
           strerror(r));
       return NULL;
@@ -2265,19 +2225,19 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if(cfg.frompkgbuild) {
+  if (cfg.frompkgbuild) {
     /* treat arguments as filenames to load/extract */
     cfg.targets = load_targets_from_files(cfg.targets);
-  } else if(alpm_list_find_str(cfg.targets, "-")) {
+  } else if (alpm_list_find_str(cfg.targets, "-")) {
     char *vdata;
     cfg.targets = alpm_list_remove_str(cfg.targets, "-", &vdata);
     free(vdata);
     cwr_printf(LOG_DEBUG, "reading targets from stdin\n");
     ret = read_targets_from_file(stdin, &cfg.targets);
-    if(ret != 0) {
+    if (ret != 0) {
       goto finish;
     }
-    if(!freopen(ctermid(NULL), "r", stdin)) {
+    if (!freopen(ctermid(NULL), "r", stdin)) {
       cwr_printf(LOG_DEBUG, "failed to reopen stdin for reading\n");
     }
   }
@@ -2285,40 +2245,40 @@ int main(int argc, char *argv[]) {
   openssl_crypto_init();
 
   pmhandle = alpm_init();
-  if(!pmhandle) {
+  if (!pmhandle) {
     cwr_fprintf(stderr, LOG_ERROR, "failed to initialize alpm library\n");
     goto finish;
   }
 
   /* allow specific updates to be provided instead of examining all foreign pkgs */
-  if((cfg.opmask & OP_UPDATE) && !cfg.targets) {
+  if ((cfg.opmask & OP_UPDATE) && !cfg.targets) {
     cfg.targets = alpm_find_foreign_pkgs();
-    if(cfg.targets == NULL) {
+    if (cfg.targets == NULL) {
       /* no foreign packages found, just exit */
       goto finish;
     }
   }
 
   /* override task behavior */
-  if(cfg.opmask & OP_UPDATE) {
+  if (cfg.opmask & OP_UPDATE) {
     task.threadfn = task_update;
-  } else if(cfg.opmask & OP_INFO) {
+  } else if (cfg.opmask & OP_INFO) {
     task.threadfn = task_query;
     printfn = cfg.format ? print_pkg_formatted : print_pkg_info;
-  } else if(cfg.opmask & OP_SEARCH) {
+  } else if (cfg.opmask & OP_SEARCH) {
     task.threadfn = task_query;
     printfn = cfg.format ? print_pkg_formatted : print_pkg_search;
-  } else if(cfg.opmask & OP_DOWNLOAD) {
+  } else if (cfg.opmask & OP_DOWNLOAD) {
     task.threadfn = task_download;
   }
 
   workq = cfg.targets;
 
   num_threads = alpm_list_count(cfg.targets);
-  if(num_threads == 0) {
+  if (num_threads == 0) {
     fprintf(stderr, "error: no targets specified (use -h for help)\n");
     goto finish;
-  } else if(num_threads > cfg.maxthreads) {
+  } else if (num_threads > cfg.maxthreads) {
     num_threads = cfg.maxthreads;
   }
 

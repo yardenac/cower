@@ -40,7 +40,7 @@ static char *aur_vurlf(aur_t *aur, const char *urlpath_format, va_list ap) {
   va_end(aq);
 
   out = malloc(len);
-  if(out == NULL) {
+  if (out == NULL) {
     return NULL;
   }
 
