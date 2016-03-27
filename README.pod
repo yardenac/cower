@@ -19,8 +19,8 @@ as a lone dash (-), additional targets will be read from stdin.
 
 =item B<-d, --download>
 
-Download I<target>. Pass this option twice to fetch dependencies (done
-recursively).
+Download I<target>. Pass this option twice to fetch uninstalled dependencies
+(done recursively).
 
 =item B<-i, --info>
 
