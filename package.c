@@ -83,7 +83,7 @@ static int json_map_key_cmp(const void *a, const void *b) {
   return strcmp(j->key, k->key);
 }
 
-static const struct json_descriptor_t *descmap_get_key(struct json_descriptor_t table[], size_t tabsize, const char *key) {
+static const struct json_descriptor_t *descmap_get_key(const struct json_descriptor_t table[], size_t tabsize, const char *key) {
   struct json_descriptor_t needle = { .key = key };
 
   return bsearch(&needle, table, tabsize, sizeof(struct json_descriptor_t), json_map_key_cmp);
@@ -136,7 +136,7 @@ static int copy_to_array(yajl_val node, char ***l) {
   return 0;
 }
 
-static int copy_to_object(yajl_val node, struct json_descriptor_t table[], size_t tabsize, uint8_t *output_base) {
+static int copy_to_object(yajl_val node, const struct json_descriptor_t table[], size_t tabsize, uint8_t *output_base) {
   size_t i;
 
   for (i = 0; i < YAJL_GET_OBJECT(node)->len; ++i) {
@@ -189,7 +189,7 @@ int aur_packages_from_json(const char *json, aurpkg_t ***packages, int *count) {
   _cleanup_packages_free_ aurpkg_t **p = NULL;
   size_t i;
 
-  struct json_descriptor_t table[] = {
+  static const struct json_descriptor_t table[] = {
     {"CategoryID",     yajl_t_number, offsetof(aurpkg_t, category_id) },
     {"CheckDepends",   yajl_t_array,  offsetof(aurpkg_t, checkdepends) },
     {"Conflicts",      yajl_t_array,  offsetof(aurpkg_t, conflicts) },
@@ -233,7 +233,7 @@ int aur_packages_from_json(const char *json, aurpkg_t ***packages, int *count) {
       return -ENOMEM;
     }
 
-    for (i = 0; i < results->u.array.len; ++i) {
+    for (i = 0; i < YAJL_GET_ARRAY(results)->len; ++i) {
       int r;
 
       p[i] = calloc(1, sizeof(*p[i]));
