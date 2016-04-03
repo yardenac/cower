@@ -786,26 +786,22 @@ aurpkg_t **filter_results(aurpkg_t **packages) {
 }
 
 int getcols(void) {
-  int termwidth = -1;
-  const int default_tty = 80;
-  const int default_notty = 0;
+  int c;
+  struct winsize ws;
+  static int cached_columns = -1;
 
-  if (!isatty(fileno(stdout))) {
-    return default_notty;
+  if (cached_columns >= 0) {
+    return cached_columns;
   }
 
-#ifdef TIOCGSIZE
-  struct ttysize win;
-  if (ioctl(1, TIOCGSIZE, &win) == 0) {
-    termwidth = win.ts_cols;
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) {
+    c = ws.ws_col;
+  } else {
+    c = isatty(STDOUT_FILENO) ? 80 : 0;
   }
-#elif defined(TIOCGWINSZ)
-  struct winsize win;
-  if (ioctl(1, TIOCGWINSZ, &win) == 0) {
-    termwidth = win.ws_col;
-  }
-#endif
-  return termwidth <= 0 ? default_tty : termwidth;
+
+  cached_columns = c;
+  return cached_columns;
 }
 
 char *get_file_as_buffer(const char *path) {
@@ -1733,14 +1729,7 @@ void print_pkg_search(aurpkg_t *pkg) {
 void print_results(aurpkg_t **packages, void (*printfn)(aurpkg_t*)) {
   aurpkg_t **r;
 
-  if (!printfn) {
-    return;
-  }
-
-  if (packages == NULL) {
-    if (cfg.opmask & OP_INFO) {
-      cwr_fprintf(stderr, LOG_ERROR, "no results found\n");
-    }
+  if (printfn == NULL || packages == NULL) {
     return;
   }
 
