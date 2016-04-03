@@ -59,11 +59,6 @@ if updates are available.
 
 =over 4
 
-=item B<-b>, B<--brief>
-
-Show output in a more script friendly format. Use this if you're wrapping cower
-for some sort of automation.
-
 =item B<--by=>I<what>
 
 Search by one of I<name>, I<name-desc>, or I<maintainer> to search for packages

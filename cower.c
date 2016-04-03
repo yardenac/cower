@@ -95,10 +95,6 @@ static inline void fclosep(FILE **f) { if (*f) fclose(*f); }
 #define BOLDCYAN              "\033[1;36m"
 #define BOLDWHITE             "\033[1;37m"
 
-#define BRIEF_ERR             "E"
-#define BRIEF_WARN            "W"
-#define BRIEF_OK              "S"
-
 /* typedefs and objects */
 typedef enum __loglevel_t {
   LOG_INFO    = 1,
@@ -106,7 +102,6 @@ typedef enum __loglevel_t {
   LOG_WARN    = (1 << 2),
   LOG_DEBUG   = (1 << 3),
   LOG_VERBOSE = (1 << 4),
-  LOG_BRIEF   = (1 << 5)
 } loglevel_t;
 
 typedef enum __operation_t {
@@ -647,7 +642,6 @@ int task_http_execute(struct task_t *task, const char *url, const char *arg) {
 
   r = curl_easy_perform(task->curl);
   if (r != CURLE_OK) {
-    cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", arg);
     cwr_fprintf(stderr, LOG_ERROR, "[%s]: %s\n", arg, curl_easy_strerror(r));
     return 1;
   }
@@ -656,7 +650,6 @@ int task_http_execute(struct task_t *task, const char *url, const char *arg) {
   cwr_printf(LOG_DEBUG, "[%s]: server responded with %ld\n", arg, response_code);
 
   if (response_code != 200) {
-    cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", arg);
     cwr_fprintf(stderr, LOG_ERROR, "[%s]: server responded with HTTP %ld\n",
         arg, response_code);
     return 1;
@@ -673,7 +666,6 @@ aurpkg_t **download(struct task_t *task, const char *package) {
 
   result = rpc_do(task, RPC_INFO, package);
   if (!result) {
-    cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "no results found for %s\n", package);
     return NULL;
   }
@@ -681,7 +673,6 @@ aurpkg_t **download(struct task_t *task, const char *package) {
   cwr_printf(LOG_DEBUG, "package %s is part of pkgbase %s\n", package, result[0]->pkgbase);
 
   if (access(result[0]->pkgbase, F_OK) == 0 && !cfg.force) {
-    cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "`%s/%s' already exists. Use -f to overwrite.\n",
         cfg.working_dir, result[0]->pkgbase);
     aur_packages_free(result);
@@ -700,13 +691,11 @@ aurpkg_t **download(struct task_t *task, const char *package) {
 
   ret = archive_extract_file(response.data, response.size);
   if (ret != 0) {
-    cwr_fprintf(stderr, LOG_BRIEF, BRIEF_ERR "\t%s\t", package);
     cwr_fprintf(stderr, LOG_ERROR, "[%s]: failed to extract tarball: %s\n",
         package, strerror(ret));
     goto finish;
   }
 
-  cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\t", result[0]->name);
   cwr_printf(LOG_INFO, "%s%s%s downloaded to %s\n",
       colstr.pkg, result[0]->name, colstr.nc, cfg.working_dir);
 
@@ -1157,7 +1146,6 @@ int parse_options(int argc, char *argv[]) {
     {"update",        no_argument,        0, 'u'},
 
     /* options */
-    {"brief",         no_argument,        0, 'b'},
     {"by",            required_argument,  0, OP_SEARCHBY},
     {"color",         optional_argument,  0, 'c'},
     {"debug",         no_argument,        0, OP_DEBUG},
@@ -1209,9 +1197,6 @@ int parse_options(int argc, char *argv[]) {
         break;
 
       /* options */
-      case 'b':
-        cfg.logmask |= LOG_BRIEF;
-        break;
       case 'c':
         if (!optarg || streq(optarg, "auto")) {
           if (isatty(fileno(stdout))) {
@@ -1401,7 +1386,6 @@ int pkg_is_binary(const char *pkg) {
   const char *db = alpm_provides_pkg(pkg);
 
   if (db) {
-    cwr_fprintf(stderr, LOG_BRIEF, BRIEF_WARN "\t%s\t", pkg);
     cwr_fprintf(stderr, LOG_WARN, "%s%s%s is available in %s%s%s "
         "(ignore this with --ignorerepo=%s)\n",
         colstr.pkg, pkg, colstr.nc,
@@ -1776,10 +1760,6 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
     cfg.targets = alpm_list_add(cfg.targets, sanitized);
     pthread_mutex_unlock(&listlock);
   } else {
-    if (cfg.logmask & LOG_BRIEF &&
-            !alpm_find_satisfier(alpm_db_get_pkgcache(db_local), depend)) {
-        cwr_printf(LOG_BRIEF, BRIEF_OK "\t%s\n", sanitized);
-    }
     free(sanitized);
     return;
   }
@@ -2005,7 +1985,7 @@ aurpkg_t **task_update(struct task_t *task, const char *arg) {
 
   if (alpm_pkg_vercmp(packages[0]->version, alpm_pkg_get_version(pmpkg)) > 0) {
     if (alpm_list_find(cfg.ignore.pkgs, arg, globcompare)) {
-      if (!cfg.quiet && !(cfg.logmask & LOG_BRIEF)) {
+      if (!cfg.quiet) {
         cwr_fprintf(stderr, LOG_WARN, "%s%s%s [ignored] %s%s%s -> %s%s%s\n",
             colstr.pkg, arg, colstr.nc,
             colstr.ood, alpm_pkg_get_version(pmpkg), colstr.nc,
@@ -2101,7 +2081,6 @@ void usage(void) {
       "      --timeout <num>       specify connection timeout in seconds\n"
       "  -V, --version             display version\n\n");
   fprintf(stderr, " Output options:\n"
-      "  -b, --brief               show output in a more script friendly format\n"
       "  -c[WHEN], --color[=WHEN]  use colored output. WHEN is `never', `always', or `auto'\n"
       "      --debug               show debug output\n"
       "      --format <string>     print package output according to format string\n"

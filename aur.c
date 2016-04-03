@@ -92,7 +92,7 @@ char *aur_build_url(aur_t *aur, const char *urlpath) {
 int aur_new(const char *proto, const char *domain, aur_t **aur) {
   aur_t *a;
 
-  if (proto == NULL || domain == NULL) {
+  if (proto == NULL || domain == NULL || aur == NULL) {
     return -EINVAL;
   }
 
