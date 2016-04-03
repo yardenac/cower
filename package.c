@@ -7,9 +7,8 @@
 
 #include <yajl/yajl_tree.h>
 
+#include "macro.h"
 #include "package.h"
-
-#define ARRAYSIZE(x) (sizeof(x)/sizeof(x[0]))
 
 static void free_strv(char **strv) {
   char **s;

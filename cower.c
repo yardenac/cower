@@ -51,6 +51,7 @@
 #include <yajl/yajl_parse.h>
 
 #include "aur.h"
+#include "macro.h"
 #include "package.h"
 
 /* macros */
@@ -1796,21 +1797,23 @@ void resolve_one_dep(struct task_t *task, const char *depend) {
 
 void resolve_pkg_dependencies(struct task_t *task, aurpkg_t *package) {
   struct deparray_t {
-    char ***array;
+    char **array;
     const char *name;
   } deparrays[] = {
-    { &package->depends, "depends" },
-    { &package->makedepends, "makedepends" },
-    { &package->checkdepends, "checkdepends" },
-    { NULL, NULL },
+    { package->depends, "depends" },
+    { package->makedepends, "makedepends" },
+    { package->checkdepends, "checkdepends" },
   };
-  struct deparray_t *d;
+  unsigned i;
 
-  for (d = deparrays; d->array; d++) {
-    cwr_printf(LOG_DEBUG, "resolving %s for %s\n", d->name, package->name);
-    if (*d->array) {
+  for (i = 0; i < ARRAYSIZE(deparrays); ++i) {
+    const struct deparray_t *d = &deparrays[i];
+
+    if (d->array) {
       char **p;
-      for (p = *d->array; *p; p++) {
+
+      cwr_printf(LOG_DEBUG, "resolving %s for %s\n", d->name, package->name);
+      for (p = d->array; *p; ++p) {
         resolve_one_dep(task, *p);
       }
     }
