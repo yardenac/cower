@@ -63,11 +63,15 @@ aur.o: \
 OBJ += aur.o
 
 package.o: \
+	macro.h \
 	package.c \
 	package.h
 OBJ += package.o
 
 cower.o: \
+	aur.h \
+	macro.h \
+	package.h \
 	cower.c
 OBJ += cower.o
 
