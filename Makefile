@@ -91,8 +91,8 @@ cower.1: README.pod
 install: all
 	install -D -m755 cower "$(DESTDIR)$(PREFIX)/bin/cower"
 	install -D -m644 cower.1 "$(DESTDIR)$(MANPREFIX)/man1/cower.1"
-	install -D -m644 bash_completion "$(DESTDIR)$(bash_completiondir)/cower"
-	install -D -m644 zsh_completion "$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower"
+	install -D -m644 extra/bash_completion "$(DESTDIR)$(bash_completiondir)/cower"
+	install -D -m644 extra/zsh_completion "$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_cower"
 	install -D -m644 config "$(DESTDIR)$(PREFIX)/share/doc/cower/config"
 
 uninstall:
