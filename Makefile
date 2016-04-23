@@ -57,6 +57,8 @@ all: $(OUT) doc
 # object rules
 OBJ=
 
+VPATH=src
+
 aur.o: \
 	aur.c \
 	aur.h
