@@ -112,7 +112,7 @@ clean:
 
 upload: dist
 	gpg --detach-sign $(OUT)-$(VERSION).tar.gz
-	scp $(OUT)-$(VERSION).tar.gz $(OUT)-$(VERSION).tar.gz.sig code.falconindy.com:archive/$(OUT)/
+	scp $(OUT)-$(VERSION).tar.gz $(OUT)-$(VERSION).tar.gz.sig pkgbuild.com:public_html/sources/$(OUT)/
 
 .PHONY: clean dist doc install uninstall
 
