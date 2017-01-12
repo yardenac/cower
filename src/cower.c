@@ -1691,13 +1691,20 @@ void print_pkg_info(aurpkg_t *pkg) {
   print_extinfo_list(pkg->replaces, "Replaces", kListDelim, 1);
   print_extinfo_list(pkg->licenses, "License", kListDelim, 1);
 
-  printf("Votes          : %d\n"
-         "Popularity     : %.2f\n"
-         "Out of Date    : %s%s%s\n",
-         pkg->votes,
-         pkg->popularity,
-         pkg->out_of_date ? colstr.ood : colstr.utd,
-         pkg->out_of_date ? "Yes" : "No", colstr.nc);
+  printf("Votes          : %d\n", pkg->votes);
+  printf("Popularity     : %.2f\n", pkg->popularity);
+
+  printf("Out of Date    : ");
+  if (pkg->out_of_date) {
+    char str[42];
+    struct tm t;
+
+    strftime(str, 42, "%c", localtime_r(&pkg->out_of_date, &t));
+
+    printf("%sYes%s [%s]\n", colstr.ood, colstr.nc, str);
+  } else {
+    printf("%sNo%s\n", colstr.utd, colstr.nc);
+  }
 
   print_colored("Maintainer", NULL, pkg->maintainer ? pkg->maintainer : "(orphan)");
   print_time("Submitted", &pkg->submitted_s);

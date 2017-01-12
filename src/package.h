@@ -15,9 +15,9 @@ struct aurpkg_t {
   int category_id;
   int package_id;
   int pkgbaseid;
-  int out_of_date;
   int votes;
   double popularity;
+  time_t out_of_date;
   time_t submitted_s;
   time_t modified_s;
 
