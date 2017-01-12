@@ -201,6 +201,8 @@ formatter:
 
   %v    version
 
+  %w    out of date (date)
+
   %%    a literal %
 
 The following sequences refer to multivalued items which are delimited by the

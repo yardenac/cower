@@ -1582,6 +1582,10 @@ void print_pkg_formatted(aurpkg_t *pkg) {
         case 'v':
           printf(fmt, pkg->version);
           break;
+        case 'w':
+          snprintf(buf, 64, "%ld", pkg->out_of_date);
+          printf(fmt, buf);
+          break;
         /* list based attributes */
         case 'C':
           print_extinfo_list(pkg->conflicts, NULL, cfg.delim, 0);
