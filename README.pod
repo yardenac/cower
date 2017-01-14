@@ -201,7 +201,7 @@ formatter:
 
   %v    version
 
-  %w    out of date (date)
+  %w    out of date (unix timestamp)
 
   %%    a literal %
 
