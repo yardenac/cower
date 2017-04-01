@@ -47,7 +47,6 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <curl/curl.h>
-#include <openssl/crypto.h>
 #include <yajl/yajl_parse.h>
 
 #include "aur.h"
@@ -177,10 +176,6 @@ static int globcompare(const void *a, const void *b);
 static int have_unignored_results(aurpkg_t **packages);
 static void indentprint(const char*, int);
 static alpm_list_t *load_targets_from_files(alpm_list_t *files);
-static void openssl_crypto_cleanup(void);
-static void openssl_crypto_init(void);
-static void openssl_thread_id(CRYPTO_THREADID *id);
-static void openssl_thread_cb(int, int, const char*, int);
 static alpm_list_t *parse_bash_array(alpm_list_t*, char*);
 static int parse_configfile(void);
 static int parse_options(int, char*[]);
@@ -220,7 +215,6 @@ static void version(void);
 static alpm_handle_t *pmhandle;
 static alpm_db_t *db_local;
 static alpm_list_t *workq;
-static pthread_mutex_t *openssl_lock;
 static pthread_mutex_t listlock = PTHREAD_MUTEX_INITIALIZER;
 
 static const int kInfoIndent = 17;
@@ -947,43 +941,6 @@ alpm_list_t *load_targets_from_files(alpm_list_t *files) {
   }
 
   return targets;
-}
-
-void openssl_crypto_cleanup(void) {
-  int i;
-
-  CRYPTO_set_locking_callback(NULL);
-
-  for (i = 0; i < CRYPTO_num_locks(); i++) {
-    pthread_mutex_destroy(&openssl_lock[i]);
-  }
-
-  OPENSSL_free(openssl_lock);
-}
-
-void openssl_crypto_init(void) {
-  int i;
-
-  openssl_lock = OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
-  for (i = 0; i < CRYPTO_num_locks(); i++) {
-    pthread_mutex_init(&openssl_lock[i], NULL);
-  }
-
-  CRYPTO_THREADID_set_callback(openssl_thread_id);
-  CRYPTO_set_locking_callback(openssl_thread_cb);
-}
-
-void openssl_thread_cb(int mode, int type, const char UNUSED *file,
-    int UNUSED line) {
-  if (mode & CRYPTO_LOCK) {
-    pthread_mutex_lock(&openssl_lock[type]);
-  } else {
-    pthread_mutex_unlock(&openssl_lock[type]);
-  }
-}
-
-void openssl_thread_id(CRYPTO_THREADID *id) {
-  CRYPTO_THREADID_set_numeric(id, pthread_self());
 }
 
 alpm_list_t *parse_bash_array(alpm_list_t *deplist, char *array) {
@@ -2224,8 +2181,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  openssl_crypto_init();
-
   pmhandle = alpm_init();
   if (!pmhandle) {
     cwr_fprintf(stderr, LOG_ERROR, "failed to initialize alpm library\n");
@@ -2277,8 +2232,6 @@ int main(int argc, char *argv[]) {
   print_results(results, printfn);
 
   aur_packages_free(results);
-
-  openssl_crypto_cleanup();
 
 finish:
   free(cfg.working_dir);

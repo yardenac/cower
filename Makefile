@@ -47,7 +47,7 @@ ldflags.asan = -fsanitize=address
 CPPFLAGS  := -D_GNU_SOURCE -DCOWER_VERSION=\"$(VERSION)\" $(CPPFLAGS)
 CFLAGS    := $(cflags.common) $(cflags.$(BUILD)) $(CFLAGS)
 LDFLAGS   := -pthread $(ldflags.$(BUILD)) $(LDFLAGS)
-LDLIBS     = -lcurl -lalpm -lyajl -larchive -lcrypto
+LDLIBS     = -lcurl -lalpm -lyajl -larchive
 
 bash_completiondir = /usr/share/bash-completion/completions
 
