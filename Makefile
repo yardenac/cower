@@ -2,7 +2,7 @@
 
 OUT        = cower
 
-VERSION    = 16
+VERSION    = 17
 VDEVEL     = $(shell test -d .git && git describe 2>/dev/null)
 
 ifneq "$(VDEVEL)" ""
@@ -47,7 +47,7 @@ ldflags.asan = -fsanitize=address
 CPPFLAGS  := -D_GNU_SOURCE -DCOWER_VERSION=\"$(VERSION)\" $(CPPFLAGS)
 CFLAGS    := $(cflags.common) $(cflags.$(BUILD)) $(CFLAGS)
 LDFLAGS   := -pthread $(ldflags.$(BUILD)) $(LDFLAGS)
-LDLIBS     = -lcurl -lalpm -lyajl -larchive
+LDLIBS     = $(shell pkg-config --libs libcurl libalpm yajl libarchive)
 
 bash_completiondir = /usr/share/bash-completion/completions
 
