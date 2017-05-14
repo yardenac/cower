@@ -9,6 +9,10 @@ ifneq "$(VDEVEL)" ""
 VERSION    = $(VDEVEL)
 endif
 
+ifeq "$(shell command -v pkg-config 2>/dev/null)" ""
+$(error pkg-config not found -- install base-devel)
+endif
+
 PREFIX    ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
 
