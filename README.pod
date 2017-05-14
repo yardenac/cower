@@ -222,6 +222,8 @@ B<--listdelim> option.
 
   %R    replaces
 
+  %G    groups
+
   %L    licenses
 
   %W    keywords

@@ -1568,6 +1568,9 @@ void print_pkg_formatted(aurpkg_t *pkg) {
         case 'W':
           print_extinfo_list(pkg->keywords, NULL, cfg.delim, 0);
           break;
+        case 'G':
+          print_extinfo_list(pkg->groups, NULL, cfg.delim, 0);
+          break;
         case 'L':
           print_extinfo_list(pkg->licenses, NULL, cfg.delim, 0);
           break;
@@ -1634,6 +1637,7 @@ void print_pkg_info(aurpkg_t *pkg) {
   if (pkg->keywords) {
     print_extinfo_list(pkg->keywords, "Keywords", kListDelim, 1);
   }
+  print_extinfo_list(pkg->groups, "Groups", kListDelim, 1);
 
   print_extinfo_list(pkg->depends, "Depends On", kListDelim, 1);
   print_extinfo_list(pkg->makedepends, "Makedepends", kListDelim, 1);
