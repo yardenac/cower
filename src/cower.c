@@ -592,7 +592,8 @@ void task_reset(struct task_t *task, const char *url, void *writedata) {
 void task_reset_for_rpc(struct task_t *task, const char *url, void *writedata) {
   task_reset(task, url, writedata);
 
-  curl_easy_setopt(task->curl, CURLOPT_ACCEPT_ENCODING, "deflate, gzip");
+  /* The empty string indicates that we should accept any supported encoding. */
+  curl_easy_setopt(task->curl, CURLOPT_ACCEPT_ENCODING, "");
 }
 
 void task_reset_for_download(struct task_t *task, const char *url, void *writedata) {
