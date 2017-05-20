@@ -64,6 +64,14 @@ static inline void freep(void *p) { free(*(void**) p); }
 #define _cleanup_fclose_ _cleanup_(fclosep)
 static inline void fclosep(FILE **f) { if (*f) fclose(*f); }
 
+#define FALLTHROUGH
+#ifdef __GNUC__
+#ifndef __clang__
+#undef FALLTHROUGH
+#define FALLTHROUGH __attribute__((fallthrough))
+#endif
+#endif
+
 #ifndef PACMAN_ROOT
   #define PACMAN_ROOT         "/"
 #endif
@@ -1193,6 +1201,7 @@ int parse_options(int argc, char *argv[]) {
         break;
       case OP_RSORT:
         cfg.sortorder = SORT_REVERSE;
+        FALLTHROUGH;
       case OP_SORT:
         if (parse_keyname(optarg)) {
           fprintf(stderr, "error: invalid argument to --%s\n", opts[option_index].name);
