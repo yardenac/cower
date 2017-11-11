@@ -19,7 +19,7 @@ _cower() {
   local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]} prevprev=${COMP_WORDS[COMP_CWORD - 2]}
 
   local shortopts=(-d -i -m -s -u -f -h -t -V -b -c -o -q -v)
-  local longopts=(--download --info --msearch --search --update --force --version
+  local longopts=(--download --info --msearch --search --update --force --version --literal
                   --brief --debug --ignore-ood --no-ignore-ood --quiet --verbose --by)
   local longoptsarg=(--ignore --ignorerepo --target --threads --timeout --color --format
                      --sort --rsort -listdelim)

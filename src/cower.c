@@ -126,6 +126,7 @@ enum {
   OP_IGNOREPKG,
   OP_IGNOREREPO,
   OP_LISTDELIM,
+  OP_LITERAL,
   OP_THREADS,
   OP_TIMEOUT,
   OP_NOIGNOREOOD,
@@ -273,6 +274,7 @@ static struct {
   short sortorder;
   int force:1;
   int getdeps:1;
+  int literal:1;
   int quiet:1;
   int skiprepos:1;
   int frompkgbuild:1;
@@ -298,7 +300,7 @@ static struct {
 };
 
 int allow_regex() {
-  return cfg.opmask & OP_SEARCH && cfg.search_by != SEARCHBY_MAINTAINER;
+  return cfg.opmask & OP_SEARCH && !cfg.literal && cfg.search_by != SEARCHBY_MAINTAINER;
 }
 
 int streq(const char *s1, const char *s2) {
@@ -1123,6 +1125,7 @@ int parse_options(int argc, char *argv[]) {
     {"no-ignore-ood", no_argument,        0, OP_NOIGNOREOOD},
     {"ignorerepo",    optional_argument,  0, OP_IGNOREREPO},
     {"listdelim",     required_argument,  0, OP_LISTDELIM},
+    {"literal",       no_argument,        0, OP_LITERAL},
     {"quiet",         no_argument,        0, 'q'},
     {"target",        required_argument,  0, 't'},
     {"threads",       required_argument,  0, OP_THREADS},
@@ -1238,6 +1241,9 @@ int parse_options(int argc, char *argv[]) {
         break;
       case OP_LISTDELIM:
         cfg.delim = optarg;
+        break;
+      case OP_LITERAL:
+        cfg.literal |= 1;
         break;
       case OP_THREADS:
         cfg.maxthreads = strtol(optarg, &token, 10);
@@ -2060,6 +2066,7 @@ void usage(void) {
       "      --sort <key>          sort results in ascending order by key\n"
       "      --rsort <key>         sort results in descending order by key\n"
       "      --listdelim <delim>   change list format delimeter\n"
+      "      --literal             disable regex search, interpret target as a literal string\n"
       "  -q, --quiet               output less\n"
       "  -v, --verbose             output more\n\n");
 }

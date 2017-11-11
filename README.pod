@@ -116,6 +116,10 @@ Specify a delimiter when printing list formatters, default to 2 spaces. This
 option only has an effect when using the B<-ii> operation combined with
 B<--format>.  See the FORMATTING section.
 
+=item B<--literal>
+
+Disable regex search, interpret target as a literal string.
+
 =item B<--no-ignore-ood>
 
 The reverse of B<--ignore-ood>.
