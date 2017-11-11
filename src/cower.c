@@ -127,6 +127,7 @@ enum {
   OP_IGNOREREPO,
   OP_LISTDELIM,
   OP_LITERAL,
+  OP_EXACT,
   OP_THREADS,
   OP_TIMEOUT,
   OP_NOIGNOREOOD,
@@ -207,6 +208,7 @@ static rpc_type rpc_op_from_opmask(int opmask);
 static aurpkg_t **rpc_do(struct task_t *task, rpc_type type, const char *arg);
 static int ch_working_dir(void);
 static int should_ignore_package(const aurpkg_t *package, regex_t *pattern);
+static int should_ignore_package_exact(const aurpkg_t *package, alpm_list_t *target);
 static void strings_init(void);
 static size_t strtrim(char*);
 static int task_http_execute(struct task_t *, const char *, const char *);
@@ -275,6 +277,7 @@ static struct {
   int force:1;
   int getdeps:1;
   int literal:1;
+  int exact:1;
   int quiet:1;
   int skiprepos:1;
   int frompkgbuild:1;
@@ -759,6 +762,20 @@ int should_ignore_package(const aurpkg_t *package, regex_t *pattern) {
   return 1;
 }
 
+int should_ignore_package_exact(const aurpkg_t *package, alpm_list_t *target) {
+  if ((cfg.search_by == SEARCHBY_NAME || cfg.search_by == SEARCHBY_NAME_DESC) &&
+      !strcmp(package->name, target->data)) {
+    return 0;
+  }
+
+  if (cfg.search_by == SEARCHBY_NAME_DESC && package->description &&
+      !strcmp(package->name, target->data)) {
+    return 0;
+  }
+
+  return 1;
+}
+
 aurpkg_t **filter_results(aurpkg_t **packages) {
   if (packages == NULL) {
     return NULL;
@@ -784,6 +801,17 @@ aurpkg_t **filter_results(aurpkg_t **packages) {
         }
       }
       regfree(&regex);
+    }
+  } else if (cfg.exact) {
+    const alpm_list_t *i;
+    for (i = cfg.targets; i; i = i->next) {
+      aurpkg_t **p;
+      for (p = packages; *p; p++) {
+        aurpkg_t *pkg = *p;
+        if (pkg->ignored || (pkg->ignored = should_ignore_package_exact(pkg, i))) {
+          continue;
+        }
+      }
     }
   }
 
@@ -1126,6 +1154,7 @@ int parse_options(int argc, char *argv[]) {
     {"ignorerepo",    optional_argument,  0, OP_IGNOREREPO},
     {"listdelim",     required_argument,  0, OP_LISTDELIM},
     {"literal",       no_argument,        0, OP_LITERAL},
+    {"exact",         no_argument,        0, OP_EXACT},
     {"quiet",         no_argument,        0, 'q'},
     {"target",        required_argument,  0, 't'},
     {"threads",       required_argument,  0, OP_THREADS},
@@ -1244,6 +1273,10 @@ int parse_options(int argc, char *argv[]) {
         break;
       case OP_LITERAL:
         cfg.literal |= 1;
+        break;
+      case OP_EXACT:
+        cfg.literal |= 1;
+        cfg.exact |= 1;
         break;
       case OP_THREADS:
         cfg.maxthreads = strtol(optarg, &token, 10);
@@ -2067,6 +2100,7 @@ void usage(void) {
       "      --rsort <key>         sort results in descending order by key\n"
       "      --listdelim <delim>   change list format delimeter\n"
       "      --literal             disable regex search, interpret target as a literal string\n"
+      "      --exact               match search target exactly, not just by substring (implies --literal)\n"
       "  -q, --quiet               output less\n"
       "  -v, --verbose             output more\n\n");
 }

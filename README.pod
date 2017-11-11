@@ -84,6 +84,11 @@ Point cower at a domain other than the default of B<aur.archlinux.org>.
 
 Show debug output. This option should be passed first if used.
 
+=item B<--exact>
+
+Only show exact matches for the search term, rather than showing all substring
+matches. Implies B<--literal>.
+
 =item B<-f, --force>
 
 Overwrite existing files when downloading.
